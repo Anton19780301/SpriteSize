@@ -19,11 +19,11 @@ jobs:
     - name: Install Qt
       uses: jurplel/install-qt-action@v3
       with:
-        version: '6.5.3' # Стабильная LTS версия
+        # ИСПРАВЛЕНО: Поднимаем версию до стабильной 6.8.0 LTS, где баг с JSON исправлен
+        version: '6.8.0' 
         host: 'windows'
         target: 'desktop'
         arch: 'win64_mingw'
-        # ИСПРАВЛЕНО: Убрали лишние модули, так как в Qt 6 они поставляются "из коробки"
         modules: '' 
 
     - name: Create build directory
@@ -42,7 +42,6 @@ jobs:
     - name: Deploy Windows Binary (windeployqt)
       run: |
         cd build
-        # ИСПРАВЛЕНО: имя файла теперь spritesize.exe с маленькой буквы
         windeployqt --qmldir ../qml Release/spritesize.exe
         copy spritesize_en.qm Release\
         copy spritesize_ru.qm Release\
@@ -69,10 +68,10 @@ jobs:
     - name: Install Qt
       uses: jurplel/install-qt-action@v3
       with:
-        version: '6.5.3'
+        # ИСПРАВЛЕНО: Синхронизируем Linux на ту же стабильную версию 6.8.0 LTS
+        version: '6.8.0'
         host: 'linux'
         target: 'desktop'
-        # ИСПРАВЛЕНО: Очистили список модулей для Linux
         modules: ''
 
     - name: Configure CMake
@@ -89,11 +88,9 @@ jobs:
     - name: Prepare Linux Package
       run: |
         mkdir -p dist
-        # ИСПРАВЛЕНО: копируем spritesize с маленькой буквы
         cp build/spritesize dist/
         cp build/spritesize_en.qm dist/
         cp build/spritesize_ru.qm dist/
-
 
     - name: Upload Linux Artifact
       uses: actions/upload-artifact@v4

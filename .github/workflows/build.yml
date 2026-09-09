@@ -8,7 +8,7 @@ on:
   workflow_dispatch: 
 
 jobs:
-  # ================= СБОРКА ПОД WINDOWS (Qt 6.11) =================
+  # ================= СБОРКА ПОД WINDOWS =================
   build-windows:
     runs-on: windows-latest
 
@@ -16,21 +16,27 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # Подключаем MSVC компилятор Visual Studio (стандарт для сборки qt_add_executable на Windows)
     - name: Set up MSVC Developer Command Prompt
       uses: ilammy/msvc-dev-cmd@v1
 
-    # Официальный инструмент установки. Скачивает ГОТОВЫЕ бинарники Qt 6.11 за 2 минуты
-    - name: Install Qt 6.11
+    # ЖЕЛЕЗОБЕТОННЫЙ ФИКС: Отключаем псевдонимы приложений Microsoft Store в реестре Windows.
+    # Это навсегда убирает ошибку "permission denied" для python.EXE на серверах GitHub!
+    - name: Disable Windows Apps Python Alias
+      run: |
+        Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\App Paths\python.exe" -Name "(Default)" -ErrorAction SilentlyContinue
+        Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\App Paths\python3.exe" -Name "(Default)" -ErrorAction SilentlyContinue
+        $sysPath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+        $filteredPath = ($sysPath -split ';' | Where-Object { $_ -notlike "*WindowsApps*" }) -join ';'
+        [Environment]::SetEnvironmentVariable("Path", $filteredPath, "Process")
+
+    - name: Install Qt 6.5.3
       uses: jurplel/install-qt-action@v3
       with:
-        version: '6.11.2' # Или '6.11.0', ставит готовую фабричную сборку
+        version: '6.5.3' # Стабильная, проверенная временем LTS версия
         host: 'windows'
         target: 'desktop'
-        arch: 'win64_msvc2022' # Идеально совпадает с msvc-dev-cmd
+        arch: 'win64_msvc2022'
         modules: ''
-        # Флаг-хак: предотвращает падение aqtinstall из-за сетевых таймаутов реестра WindowsApps
-        aqtflags: '--p7zip C:\Program` Files\7-Zip\7z.exe'
 
     - name: Create build directory
       run: mkdir build
@@ -38,7 +44,6 @@ jobs:
     - name: Configure CMake
       run: |
         cd build
-        # Генератор NMake / Ninja (MSVC) создаст чистый бинарник без конфликтов GCC
         cmake -DCMAKE_BUILD_TYPE=Release -G "NMake Makefiles" ..
 
     - name: Build Application
@@ -59,7 +64,7 @@ jobs:
         name: SpriteSize-Windows
         path: build/Release/
 
-  # ================= СБОРКА ПОД LINUX (Qt 6.11) =================
+  # ================= СБОРКА ПОД LINUX =================
   build-linux:
     runs-on: ubuntu-latest
 
@@ -72,10 +77,10 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y build-essential libgl1-mesa-dev
 
-    - name: Install Qt 6.11
+    - name: Install Qt 6.5.3
       uses: jurplel/install-qt-action@v3
       with:
-        version: '6.11.2'
+        version: '6.5.3'
         host: 'linux'
         target: 'desktop'
         modules: ''

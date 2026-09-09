@@ -1,6 +1,5 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.22)
 
-# Имя проекта оставляем SpriteSize
 project(SpriteSize VERSION 0.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -10,12 +9,21 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick LinguistTools QuickControls2 Concurrent)
+find_package(Qt6 6.5 REQUIRED COMPONENTS
+    Core
+    Gui
+    Qml
+    Quick
+    QuickControls2
+    Concurrent
+    LinguistTools
+)
 
-# Настройка стандартов путей ресурсов (убирает предупреждение QTP0001)
-qt_standard_project_setup()
+# Включает современные политики Qt для CMake.
+# Для qt_add_qml_module это особенно важно.
+qt_standard_project_setup(REQUIRES 6.5)
 
-add_executable(spritesize
+qt_add_executable(spritesize
     src/main.cpp
     src/processor.cpp
     src/processor.h
@@ -24,10 +32,9 @@ add_executable(spritesize
     resources.qrc
 )
 
-
 set(TS_FILES
-    "i18n/spritesize_en.ts"
-    "i18n/spritesize_ru.ts"
+    ${CMAKE_CURRENT_SOURCE_DIR}/i18n/spritesize_en.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/i18n/spritesize_ru.ts
 )
 
 qt_add_translations(spritesize
@@ -51,14 +58,6 @@ qt_add_qml_module(spritesize
         qml/AssetList.qml
 )
 
-if(NOT TARGET Qt6::QImageFormatsPlugin)
-    add_library(Qt6::QImageFormatsPlugin MODULE IMPORTED)
-    # Используем твой физический путь (симлинк C:\Qt)
-    set_target_properties(Qt6::QImageFormatsPlugin PROPERTIES
-        IMPORTED_LOCATION "C:/Qt/6.11.2/mingw_64/plugins/imageformats/qwebp.dll" # или qtiff.dll, подставится вся папка
-    )
-endif()
-
 target_link_libraries(spritesize PRIVATE
     Qt6::Core
     Qt6::Gui
@@ -66,9 +65,11 @@ target_link_libraries(spritesize PRIVATE
     Qt6::Quick
     Qt6::QuickControls2
     Qt6::Concurrent
-
 )
 
 if(WIN32)
-    set_target_properties(spritesize PROPERTIES WIN32_EXECUTABLE ON)
+    set_target_properties(spritesize PROPERTIES
+        WIN32_EXECUTABLE ON
+    )
 endif()
+

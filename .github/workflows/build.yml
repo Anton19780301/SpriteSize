@@ -1,169 +1,72 @@
-name: Build SpriteSize
+build-linux:
+  runs-on: ubuntu-24.04
 
-on:
-  push:
-    branches: ["main"]
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-  pull_request:
-    branches: ["main"]
+    - name: Disable Google Chrome apt repository
+      shell: bash
+      run: |
+        sudo grep -RIl "dl.google.com/linux/chrome" \
+          /etc/apt/sources.list \
+          /etc/apt/sources.list.d \
+          2>/dev/null \
+          | while read -r file; do
+            echo "Disabling: $file"
+            sudo mv "$file" "$file.disabled"
+          done
 
-  workflow_dispatch:
+    - name: Clean apt
+      run: |
+        sudo rm -rf /var/lib/apt/lists/*
+        sudo apt-get clean
+        sudo apt-get update
 
-jobs:
+    - name: Install Linux dependencies
+      run: |
+        sudo apt-get install -y \
+          build-essential \
+          libgl1-mesa-dev \
+          libxkbcommon-dev \
+          libxkbcommon-x11-dev
 
-  # ============================================
-  # WINDOWS
-  # ============================================
-  build-windows:
-    runs-on: windows-latest
+    - name: Install Qt 6.11
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: "6.11.2"
+        host: linux
+        target: desktop
+        archives: "qtbase qtdeclarative qttools"
+        cache: true
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Show Qt
+      run: |
+        qmake --version || true
+        echo "QT_ROOT_DIR=$QT_ROOT_DIR"
 
-      - name: Setup MSVC
-        uses: ilammy/msvc-dev-cmd@v1
+    - name: Configure CMake
+      run: |
+        cmake -S . -B build \
+          -DCMAKE_BUILD_TYPE=Release
 
-      - name: Install Qt 6.11
-        uses: jurplel/install-qt-action@v4
-        with:
-          version: "6.11.*"
-          host: windows
-          target: desktop
-          arch: win64_msvc2022_64
-          modules: "qtdeclarative qttools"
-          cache: true
+    - name: Build
+      run: |
+        cmake --build build \
+          --config Release \
+          --parallel
 
-      - name: Configure CMake
-        run: |
-          cmake -S . -B build `
-            -G "Visual Studio 17 2022" `
-            -A x64
+    - name: Prepare Linux package
+      shell: bash
+      run: |
+        mkdir -p dist
 
-      - name: Build
-        run: |
-          cmake --build build `
-            --config Release `
-            --parallel
+        cp build/spritesize dist/
 
-      - name: Deploy Qt
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path dist | Out-Null
+        find build -name "*.qm" -exec cp {} dist/ \;
 
-          windeployqt `
-            --release `
-            --qmldir "${{ github.workspace }}/qml" `
-            --dir dist `
-            "build/Release/spritesize.exe"
-
-          Copy-Item `
-            "build/Release/spritesize.exe" `
-            "dist/spritesize.exe"
-
-          if (Test-Path "build/spritesize_en.qm") {
-              Copy-Item "build/spritesize_en.qm" "dist/"
-          }
-
-          if (Test-Path "build/spritesize_ru.qm") {
-              Copy-Item "build/spritesize_ru.qm" "dist/"
-          }
-
-      - name: Upload Windows artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: SpriteSize-Windows
-          path: dist/
-
-
-  # ============================================
-  # LINUX
-  # ============================================
-  build-linux:
-    runs-on: ubuntu-24.04
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      # GitHub runner содержит Google Chrome.
-      # Его репозиторий нам для сборки не нужен,
-      # а сейчас он может ломать apt update из-за
-      # Hash Sum mismatch.
-      - name: Disable Google Chrome apt repository
-        shell: bash
-        run: |
-          echo "Searching for Google Chrome apt repositories..."
-
-          sudo grep -RIl "dl.google.com/linux/chrome" \
-            /etc/apt/sources.list \
-            /etc/apt/sources.list.d \
-            2>/dev/null \
-            | while read -r file; do
-              echo "Disabling: $file"
-              sudo mv "$file" "$file.disabled"
-            done
-
-          echo "Remaining Google repositories:"
-          sudo grep -RIn "dl.google.com" \
-            /etc/apt/sources.list \
-            /etc/apt/sources.list.d \
-            2>/dev/null || true
-
-      - name: Clean apt cache
-        run: |
-          sudo rm -rf /var/lib/apt/lists/*
-          sudo apt-get clean
-
-      - name: Update apt
-        run: |
-          sudo apt-get update
-
-      - name: Install build dependencies
-        run: |
-          sudo apt-get install -y \
-            build-essential \
-            libgl1-mesa-dev \
-            libxkbcommon-dev \
-            libxkbcommon-x11-dev
-
-      - name: Install Qt 6.11
-        uses: jurplel/install-qt-action@v4
-        with:
-          version: "6.11.*"
-          host: linux
-          target: desktop
-          modules: "qtdeclarative qttools"
-          cache: true
-
-      - name: Configure CMake
-        run: |
-          cmake -S . -B build \
-            -DCMAKE_BUILD_TYPE=Release
-
-      - name: Build
-        run: |
-          cmake --build build \
-            --config Release \
-            --parallel
-
-      - name: Prepare Linux package
-        shell: bash
-        run: |
-          mkdir -p dist
-
-          cp build/spritesize dist/
-
-          if [ -f build/spritesize_en.qm ]; then
-            cp build/spritesize_en.qm dist/
-          fi
-
-          if [ -f build/spritesize_ru.qm ]; then
-            cp build/spritesize_ru.qm dist/
-          fi
-
-      - name: Upload Linux artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: SpriteSize-Linux
-          path: dist/
+    - name: Upload Linux artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: SpriteSize-Linux
+        path: dist/

@@ -7,9 +7,8 @@ on:
     branches: [ "main" ]
   workflow_dispatch: 
 
-
 jobs:
-  # ================= СБОРКА ПОД WINDOWS =================
+  # ================= СБОРКА ПОД WINDOWS (MSVC СТАНДАРТ) =================
   build-windows:
     runs-on: windows-latest
 
@@ -17,13 +16,18 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    - name: Set up MSVC Developer Command Prompt
+      # Подключаем официальный компилятор Microsoft Visual Studio, встроенный в Windows
+      uses: ilammy/msvc-dev-cmd@v1
+
     - name: Install Qt
       uses: jurplel/install-qt-action@v3
       with:
         version: '6.8.0' 
         host: 'windows'
         target: 'desktop'
-        arch: 'win64_mingw'
+        # ИСПРАВЛЕНО: Меняем архитектуру на msvc2022, чтобы избежать багов GCC линковщика
+        arch: 'win64_msvc2022' 
         modules: '' 
 
     - name: Create build directory
@@ -32,11 +36,8 @@ jobs:
     - name: Configure CMake
       run: |
         cd build
-        # ИСПРАВЛЕНО: Явно указываем CMake использовать родной компилятор MinGW 13 из поставки Qt,
-        # полностью игнорируя системный конфликтующий GCC 15.2
-        cmake -DCMAKE_BUILD_TYPE=Release -G "MinGW Makefiles" `
-              -DCMAKE_C_COMPILER="${{ env.Qt6_DIR }}/../../../Tools/mingw1310_64/bin/gcc.exe" `
-              -DCMAKE_CXX_COMPILER="${{ env.Qt6_DIR }}/../../../Tools/mingw1310_64/bin/g++.exe" ..
+        # ИСПРАВЛЕНО: Используем стандартный генератор Visual Studio (он работает без сбоев на серверах)
+        cmake -DCMAKE_BUILD_TYPE=Release ..
 
     - name: Build Application
       run: |
@@ -46,6 +47,7 @@ jobs:
     - name: Deploy Windows Binary (windeployqt)
       run: |
         cd build
+        # Собираем зависимости .dll под архитектуру MSVC
         windeployqt --qmldir ../qml Release/spritesize.exe
         copy spritesize_en.qm Release\
         copy spritesize_ru.qm Release\
@@ -72,7 +74,6 @@ jobs:
     - name: Install Qt
       uses: jurplel/install-qt-action@v3
       with:
-        # ИСПРАВЛЕНО: Синхронизируем Linux на ту же стабильную версию 6.8.0 LTS
         version: '6.8.0'
         host: 'linux'
         target: 'desktop'

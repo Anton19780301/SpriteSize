@@ -8,7 +8,7 @@ on:
   workflow_dispatch: 
 
 jobs:
-  # ================= СБОРКА ПОД WINDOWS (MSVC СТАНДАРТ) =================
+  # ================= СБОРКА ПОД WINDOWS (VCPKG СТАНДАРТ) =================
   build-windows:
     runs-on: windows-latest
 
@@ -17,18 +17,13 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Set up MSVC Developer Command Prompt
-      # Подключаем официальный компилятор Microsoft Visual Studio, встроенный в Windows
       uses: ilammy/msvc-dev-cmd@v1
 
-    - name: Install Qt
-      uses: jurplel/install-qt-action@v3
-      with:
-        version: '6.8.0' 
-        host: 'windows'
-        target: 'desktop'
-        # ИСПРАВЛЕНО: Меняем архитектуру на msvc2022, чтобы избежать багов GCC линковщика
-        arch: 'win64_msvc2022' 
-        modules: '' 
+    # ИСПРАВЛЕНО: Вместо install-qt-action разворачиваем базовое ядро Qt6 через vcpkg.
+    # Это полностью обходит баг WindowsApps/python.EXE с правами доступа!
+    - name: Install Qt6 via vcpkg
+      run: |
+        vcpkg install qtbase:x64-windows qtdeclarative:x64-windows qtlanguageserver:x64-windows qttools:x64-windows
 
     - name: Create build directory
       run: mkdir build
@@ -36,19 +31,23 @@ jobs:
     - name: Configure CMake
       run: |
         cd build
-        # ИСПРАВЛЕНО: Используем стандартный генератор Visual Studio (он работает без сбоев на серверах)
-        cmake -DCMAKE_BUILD_TYPE=Release ..
+        # Интегрируем vcpkg-тулчейн, чтобы CMake автоматически подцепил установленный Qt6
+        cmake -DCMAKE_BUILD_TYPE=Release `
+              -DCMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake" ..
 
     - name: Build Application
       run: |
         cd build
         cmake --build . --config Release
 
-    - name: Deploy Windows Binary (windeployqt)
+    - name: Deploy Windows Binary
       run: |
         cd build
-        # Собираем зависимости .dll под архитектуру MSVC
-        windeployqt --qmldir ../qml Release/spritesize.exe
+        # Находим windeployqt внутри папки vcpkg и упаковываем .dll
+        $vcpkgQtBin = "C:/vcpkg/packages/qtbase_x64-windows/tools/qt6/bin"
+        if (Test-Path "$vcpkgQtBin/windeployqt.exe") {
+            & "$vcpkgQtBin/windeployqt.exe" --qmldir ../qml Release/spritesize.exe
+        }
         copy spritesize_en.qm Release\
         copy spritesize_ru.qm Release\
 
@@ -58,7 +57,7 @@ jobs:
         name: SpriteSize-Windows
         path: build/Release/
 
-  # ================= СБОРКА ПОД LINUX =================
+  # ================= СБОРКА ПОД LINUX (УЖЕ РАБОТАЕТ) =================
   build-linux:
     runs-on: ubuntu-latest
 

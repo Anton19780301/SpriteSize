@@ -42,9 +42,8 @@ jobs:
     - name: Deploy Windows Binary (windeployqt)
       run: |
         cd build
-        # Утилита windeployqt сама соберет все нужные .dll в папку релиза
-        windeployqt --qmldir ../qml Release/SpriteSize.exe
-        # Копируем скомпилированные файлы перевода на диск в папку к бинарнику
+        # ИСПРАВЛЕНО: имя файла теперь spritesize.exe с маленькой буквы
+        windeployqt --qmldir ../qml Release/spritesize.exe
         copy spritesize_en.qm Release\
         copy spritesize_ru.qm Release\
 
@@ -90,10 +89,11 @@ jobs:
     - name: Prepare Linux Package
       run: |
         mkdir -p dist
-        cp build/SpriteSize dist/
-        # Копируем файлы локализации к бинарнику
+        # ИСПРАВЛЕНО: копируем spritesize с маленькой буквы
+        cp build/spritesize dist/
         cp build/spritesize_en.qm dist/
         cp build/spritesize_ru.qm dist/
+
 
     - name: Upload Linux Artifact
       uses: actions/upload-artifact@v4

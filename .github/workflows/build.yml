@@ -8,7 +8,7 @@ on:
   workflow_dispatch: 
 
 jobs:
-  # ================= СБОРКА ПОД WINDOWS (ОФИЦИАЛЬНЫЙ СТАБИЛЬНЫЙ ФИКС) =================
+  # ================= СБОРКА ПОД WINDOWS =================
   build-windows:
     runs-on: windows-latest
 
@@ -19,14 +19,11 @@ jobs:
     - name: Set up MSVC Developer Command Prompt
       uses: ilammy/msvc-dev-cmd@v1
 
-    # Используем проверенный временем метод установки Qt, который не падает на серверах GitHub
-    - name: Install Qt6
-      uses: miurahr/install-qt-action@v3
-      with:
-        version: '6.8.0'
-        host: 'windows'
-        target: 'desktop'
-        arch: 'win64_msvc2022'
+    # Скачиваем ТОЛЬКО готовые скомпилированные DLL ядра Qt6. 
+    # Отключаем тяжелые фичи (ssl), чтобы сервер не пытался компилировать OpenSSL из исходников
+    - name: Install Qt6 via vcpkg (Binary Package)
+      run: |
+        vcpkg install qtbase[core,gui,widgets,network]:x64-windows qtdeclarative:x64-windows qttools:x64-windows
 
     - name: Create build directory
       run: mkdir build
@@ -34,7 +31,8 @@ jobs:
     - name: Configure CMake
       run: |
         cd build
-        cmake -DCMAKE_BUILD_TYPE=Release ..
+        cmake -DCMAKE_BUILD_TYPE=Release `
+              -DCMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake" ..
 
     - name: Build Application
       run: |
@@ -44,7 +42,10 @@ jobs:
     - name: Deploy Windows Binary (windeployqt)
       run: |
         cd build
-        windeployqt --qmldir ../qml Release/spritesize.exe
+        $vcpkgQtBin = "C:/vcpkg/packages/qtbase_x64-windows/tools/qt6/bin"
+        if (Test-Path "$vcpkgQtBin/windeployqt.exe") {
+            & "$vcpkgQtBin/windeployqt.exe" --qmldir ../qml Release/spritesize.exe
+        }
         copy spritesize_en.qm Release\
         copy spritesize_ru.qm Release\
 
@@ -54,7 +55,7 @@ jobs:
         name: SpriteSize-Windows
         path: build/Release/
 
-  # ================= СБОРКА ПОД LINUX (РАБОТАЕТ ОТЛИЧНО) =================
+  # ================= СБОРКА ПОД LINUX =================
   build-linux:
     runs-on: ubuntu-latest
 
@@ -62,18 +63,11 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Install System Dependencies
+    - name: Install System Dependencies & Qt6
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential libgl1-mesa-dev
-
-    - name: Install Qt
-      uses: jurplel/install-qt-action@v3
-      with:
-        version: '6.8.0'
-        host: 'linux'
-        target: 'desktop'
-        modules: ''
+        # Ставим полноценный компилятор и официальный чистый пакет Qt6 напрямую из Ubuntu
+        sudo apt-get install -y build-essential libgl1-mesa-dev qt6-base-dev qt6-declarative-dev qt6-l10n-tools qt6-tools-dev-tools
 
     - name: Configure CMake
       run: |

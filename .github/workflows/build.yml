@@ -2,93 +2,146 @@ name: Build SpriteSize
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
+
   pull_request:
-    branches: [ "main" ]
-  workflow_dispatch: 
+    branches: ["main"]
+
+  workflow_dispatch:
 
 jobs:
-  # ================= СБОРКА ПОД WINDOWS =================
+
+  # ============================================
+  # WINDOWS
+  # ============================================
   build-windows:
     runs-on: windows-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up MSVC Developer Command Prompt
-      uses: ilammy/msvc-dev-cmd@v1
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
 
-    # Скачиваем ТОЛЬКО готовые скомпилированные DLL ядра Qt6. 
-    # Отключаем тяжелые фичи (ssl), чтобы сервер не пытался компилировать OpenSSL из исходников
-    - name: Install Qt6 via vcpkg (Binary Package)
-      run: |
-        vcpkg install qtbase[core,gui,widgets,network]:x64-windows qtdeclarative:x64-windows qttools:x64-windows
+      - name: Install Qt 6.11
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.11.*"
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
+          modules: "qtdeclarative qttools"
+          cache: true
 
-    - name: Create build directory
-      run: mkdir build
+      - name: Configure CMake
+        run: |
+          cmake -S . -B build `
+            -G "Visual Studio 17 2022" `
+            -A x64
 
-    - name: Configure CMake
-      run: |
-        cd build
-        cmake -DCMAKE_BUILD_TYPE=Release `
-              -DCMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake" ..
+      - name: Build
+        run: |
+          cmake --build build `
+            --config Release `
+            --parallel
 
-    - name: Build Application
-      run: |
-        cd build
-        cmake --build . --config Release
+      - name: Deploy Qt
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
 
-    - name: Deploy Windows Binary (windeployqt)
-      run: |
-        cd build
-        $vcpkgQtBin = "C:/vcpkg/packages/qtbase_x64-windows/tools/qt6/bin"
-        if (Test-Path "$vcpkgQtBin/windeployqt.exe") {
-            & "$vcpkgQtBin/windeployqt.exe" --qmldir ../qml Release/spritesize.exe
-        }
-        copy spritesize_en.qm Release\
-        copy spritesize_ru.qm Release\
+          windeployqt `
+            --release `
+            --qmldir "${{ github.workspace }}/qml" `
+            --dir dist `
+            "build/Release/spritesize.exe"
 
-    - name: Upload Windows Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: SpriteSize-Windows
-        path: build/Release/
+          Copy-Item `
+            "build/Release/spritesize.exe" `
+            "dist/spritesize.exe"
 
-  # ================= СБОРКА ПОД LINUX =================
+          if (Test-Path "build/spritesize_en.qm") {
+              Copy-Item "build/spritesize_en.qm" "dist/"
+          }
+
+          if (Test-Path "build/spritesize_ru.qm") {
+              Copy-Item "build/spritesize_ru.qm" "dist/"
+          }
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpriteSize-Windows
+          path: dist/
+
+
+  # ============================================
+  # LINUX
+  # ============================================
   build-linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Install System Dependencies & Qt6
-      run: |
-        sudo apt-get update
-        # Ставим полноценный компилятор и официальный чистый пакет Qt6 напрямую из Ubuntu
-        sudo apt-get install -y build-essential libgl1-mesa-dev qt6-base-dev qt6-declarative-dev qt6-l10n-tools qt6-tools-dev-tools
+      - name: Remove Google Chrome repository
+        shell: bash
+        run: |
+          sudo rm -f /etc/apt/sources.list.d/google-chrome.list
+          sudo rm -f /etc/apt/sources.list.d/google-chrome.sources
 
-    - name: Configure CMake
-      run: |
-        mkdir build
-        cd build
-        cmake -DCMAKE_BUILD_TYPE=Release ..
+      - name: Update apt
+        run: |
+          sudo apt-get clean
+          sudo apt-get update
 
-    - name: Build Application
-      run: |
-        cd build
-        cmake --build . --config Release
+      - name: Install build dependencies
+        run: |
+          sudo apt-get install -y \
+            build-essential \
+            libgl1-mesa-dev \
+            libxkbcommon-dev \
+            libxkbcommon-x11-dev
 
-    - name: Prepare Linux Package
-      run: |
-        mkdir -p dist
-        cp build/spritesize dist/
-        cp build/spritesize_en.qm dist/
-        cp build/spritesize_ru.qm dist/
+      - name: Install Qt 6.11
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.11.*"
+          host: linux
+          target: desktop
+          modules: "qtdeclarative qttools"
+          cache: true
 
-    - name: Upload Linux Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: SpriteSize-Linux
-        path: dist/
+      - name: Configure CMake
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: |
+          cmake --build build \
+            --config Release \
+            --parallel
+
+      - name: Prepare Linux package
+        shell: bash
+        run: |
+          mkdir -p dist
+
+          cp build/spritesize dist/
+
+          if [ -f build/spritesize_en.qm ]; then
+            cp build/spritesize_en.qm dist/
+          fi
+
+          if [ -f build/spritesize_ru.qm ]; then
+            cp build/spritesize_ru.qm dist/
+          fi
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpriteSize-Linux
+          path: dist/

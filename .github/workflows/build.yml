@@ -1,0 +1,100 @@
+name: Build SpriteSize
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch: # Позволяет запускать сборку вручную кнопкой на GitHub
+
+jobs:
+  # ================= СБОРКА ПОД WINDOWS =================
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: '6.5.3' # Стабильная LTS версия для CI
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_mingw'
+        modules: 'qtquickcontrols2 qtconcurrent'
+
+    - name: Create build directory
+      run: mkdir build
+
+    - name: Configure CMake
+      run: |
+        cd build
+        cmake -DCMAKE_BUILD_TYPE=Release -G "MinGW Makefiles" ..
+
+    - name: Build Application
+      run: |
+        cd build
+        cmake --build . --config Release
+
+    - name: Deploy Windows Binary (windeployqt)
+      run: |
+        cd build
+        # Собираем все нужные .dll зависимости Qt в одну папку
+        windeployqt --qmldir ../qml Release/SpriteSize.exe
+        # Копируем скомпилированные файлы перевода
+        copy spritesize_en.qm Release/
+        copy spritesize_ru.qm Release/
+
+    - name: Upload Windows Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: SpriteSize-Windows
+        path: build/Release/
+
+  # ================= СБОРКА ПОД LINUX =================
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install System Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential libgl1-mesa-dev
+
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: '6.5.3'
+        host: 'linux'
+        target: 'desktop'
+        modules: 'qtquickcontrols2 qtconcurrent'
+
+    - name: Configure CMake
+      run: |
+        mkdir build
+        cd build
+        cmake -DCMAKE_BUILD_TYPE=Release ..
+
+    - name: Build Application
+      run: |
+        cd build
+        cmake --build . --config Release
+
+    - name: Prepare Linux Package
+      run: |
+        mkdir -p dist
+        cp build/SpriteSize dist/
+        # Копируем переводы в папку с бинарником
+        cp build/spritesize_en.qm dist/
+        cp build/spritesize_ru.qm dist/
+
+    - name: Upload Linux Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: SpriteSize-Linux
+        path: dist/

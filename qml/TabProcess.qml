@@ -108,7 +108,7 @@ Item {
             Layout.fillWidth: true
             spacing: 5
             visible: typeof imageProcessor !== "undefined" && imageProcessor !== null &&
-                     imageProcessor.progress > 0 && imageProcessor.progress < 100
+                     imageProcessor.progress > 0 && !startBtn.enabled
 
             ProgressBar {
                 id: processProgressBar

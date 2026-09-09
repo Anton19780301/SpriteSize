@@ -4,6 +4,8 @@
 #include <QImage>
 #include <QVariantMap>
 #include <QUrl>
+#include <QtConcurrent>
+#include <QDateTime>
 
 ImageProcessor::ImageProcessor(QObject *parent) : QObject(parent) {}
 
@@ -58,43 +60,41 @@ void ImageProcessor::toggleAssetSelection(int index, bool selected) {
     }
 }
 
+void ImageProcessor::setStatusMessage(const QString &message) {
+    if (m_statusMessage != message) {
+        m_statusMessage = message;
+        emit statusMessageChanged();
+    }
+}
+
 void ImageProcessor::startProcessing(int targetWidth, int targetHeight, bool useNearestNeighbor) {
-    m_progress = 0;
+    m_progress = 1;
     emit progressChanged();
-
-    QDir dir(m_inputPath);
-    if (!dir.exists()) {
-        m_statusMessage = tr("Ошибка: указанная папка не существует!");
-        emit statusMessageChanged();
-        emit processingFinished(0, tr("Указанная папка не существует!"));
-        return;
-    }
-
-    if (m_assetModel.isEmpty()) {
-        m_statusMessage = tr("Ошибка: нет файлов для обработки.");
-        emit statusMessageChanged();
-        emit processingFinished(0, tr("Нет файлов для обработки."));
-        return;
-    }
 
     m_statusMessage = tr("Запущено пакетное сжатие ассетов...");
     emit statusMessageChanged();
+    QtConcurrent::run(&ImageProcessor::processTask, this, targetWidth, targetHeight, useNearestNeighbor);
 
-    // Создаем изолированную подпапку для бэкапов исходников
-    QString backupDirName = "_backup";
+}
+
+void ImageProcessor::processTask(int targetWidth, int targetHeight, bool useNearestNeighbor) {
+    QDir dir(m_inputPath);
+
+    //Генерируем уникальное имя папки на основе текущего времени
+    QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss");
+    QString backupDirName = QString("_backup_%1").arg(timestamp);
+
     if (!dir.exists(backupDirName)) {
         dir.mkdir(backupDirName);
     }
     QDir backupDir(dir.filePath(backupDirName));
 
     int processedCount = 0;
-    // Выбираем алгоритм: FastTransformation (Nearest Neighbor) для пиксель-арта, Smooth для гладких ИИ-картинок
     Qt::TransformationMode mode = useNearestNeighbor ? Qt::FastTransformation : Qt::SmoothTransformation;
 
     for (int i = 0; i < m_assetModel.size(); ++i) {
         QVariantMap asset = m_assetModel.at(i).toMap();
 
-        //Если пользователь снял галочку с текстуры, полностью её игнорируем
         if (!asset["checked"].toBool()) {
             continue;
         }
@@ -103,35 +103,29 @@ void ImageProcessor::startProcessing(int targetWidth, int targetHeight, bool use
         QString origFilePath = dir.filePath(fileName);
         QString backupFilePath = backupDir.filePath(fileName);
 
-        //делаем бэкап, копируя оригинальный файл (если его там еще нет)
-        if (!backupDir.exists(fileName)) {
-            QFile::copy(origFilePath, backupFilePath);
-        }
+        QFile::copy(origFilePath, backupFilePath);
 
-        //загружаем изображение из папки бэкапа, чтобы не жать уже пережатый файл
         QImage img;
         if (img.load(backupFilePath)) {
             QImage scaledImg = img.scaled(targetWidth, targetHeight, Qt::IgnoreAspectRatio, mode);
-            // Сохраняем результат обратно в рабочую папку проекта
             if (scaledImg.save(origFilePath)) {
                 processedCount++;
             }
         }
 
-        // Двигаем шкалу прогресс-бара
         m_progress = static_cast<int>(((i + 1) * 100) / m_assetModel.size());
         emit progressChanged();
+
+        QThread::msleep(50);
     }
+
+    // Финал работы фонового потока
+    m_progress = 100;
+    emit progressChanged();
 
     m_statusMessage = tr("Сжатие завершено! Успешно обработано файлов: %1").arg(processedCount);
     emit statusMessageChanged();
+
     emit processingFinished(processedCount, tr("Обработка успешно завершена!"));
     scanDirectory();
-}
-
-void ImageProcessor::setStatusMessage(const QString &message) {
-    if (m_statusMessage != message) {
-        m_statusMessage = message;
-        emit statusMessageChanged();
-    }
 }

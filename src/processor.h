@@ -21,26 +21,28 @@ public:
 
     int progress() const { return m_progress; }
     QVariantList assetModel() const { return m_assetModel; }
+    QString statusMessage() const { return m_statusMessage; }
+    void setStatusMessage(const QString &message);
 
     Q_INVOKABLE void scanDirectory();
     Q_INVOKABLE void toggleAssetSelection(int index, bool selected);
     Q_INVOKABLE void startProcessing(int targetWidth, int targetHeight, bool useNearestNeighbor);
 
-    QString statusMessage() const { return m_statusMessage; }
-    void setStatusMessage(const QString &message);
-
 signals:
     void inputPathChanged();
     void progressChanged();
     void assetModelChanged();
-    void processingFinished(int totalProcessed, const QString &message);
     void statusMessageChanged();
+    void processingFinished(int totalProcessed, const QString &message);
 
 private:
+    //QString m_m_inputPath;
     QString m_inputPath;
     int m_progress = 0;
-    QVariantList m_assetModel; // Хранит список QVariantMap (словарей) с данными файлов
+    QVariantList m_assetModel;
     QString m_statusMessage = "Программа готова к работе";
+
+    void processTask(int targetWidth, int targetHeight, bool useNearestNeighbor);
 };
 
 #endif // PROCESSOR_H

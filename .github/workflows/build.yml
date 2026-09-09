@@ -30,10 +30,11 @@ jobs:
     - name: Install Qt 6.8.0
       uses: jurplel/install-qt-action@v3
       with:
-        version: '6.8.0' # Исправленная LTS версия
+        version: '6.8.0'
         host: 'windows'
         target: 'desktop'
-        arch: 'win64_msvc2022' # Официальное имя архитектуры в ветке 6.8
+        # ИСПРАВЛЕНО: Полное имя архитектуры в официальной базе пакетов Qt 6.8.0
+        arch: 'win64_msvc2022_64' 
         modules: ''
 
     - name: Create build directory

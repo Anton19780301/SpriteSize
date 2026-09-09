@@ -1,17 +1,18 @@
-name: Build SpriteSize
+name: Build and Release SpriteSize
 
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
   workflow_dispatch: 
+
+# Даем серверу права на запись и создание Релизов
+permissions:
+  contents: write
 
 jobs:
   # ================= СБОРКА ПОД WINDOWS =================
   build-windows:
     runs-on: windows-latest
-
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -23,18 +24,14 @@ jobs:
       run: |
         Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\App Paths\python.exe" -Name "(Default)" -ErrorAction SilentlyContinue
         Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\App Paths\python3.exe" -Name "(Default)" -ErrorAction SilentlyContinue
-        $sysPath = [Environment]::GetEnvironmentVariable("Path", "Machine")
-        $filteredPath = ($sysPath -split ';' | Where-Object { $_ -notlike "*WindowsApps*" }) -join ';'
-        [Environment]::SetEnvironmentVariable("Path", $filteredPath, "Process")
 
-    - name: Install Qt 6.8.0
+    - name: Install Qt 6.5.3
       uses: jurplel/install-qt-action@v3
       with:
-        version: '6.8.0'
+        version: '6.5.3'
         host: 'windows'
         target: 'desktop'
-        # ИСПРАВЛЕНО: Полное имя архитектуры в официальной базе пакетов Qt 6.8.0
-        arch: 'win64_msvc2022_64' 
+        arch: 'win64_msvc2019_64'
         modules: ''
 
     - name: Create build directory
@@ -53,20 +50,23 @@ jobs:
     - name: Deploy Windows Binary (windeployqt)
       run: |
         cd build
-        # Вызываем деплойщик, он собирает все нужные .dll. 
-        # А файлы перевода .qm уже сгенерированы самим CMake и лежат в этой папке!
-        windeployqt --qmldir ../qml spritesize.exe
+        & "windeployqt" --qmldir ../qml spritesize.exe
+
+    # Упаковываем Windows-сборку в ZIP прямо в шаге сборки
+    - name: Pack Windows Release
+      run: |
+        cd build
+        Compress-Archive -Path * -DestinationPath ../SpriteSize-Windows.zip
 
     - name: Upload Windows Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: SpriteSize-Windows
-        path: build/
+        name: SpriteSize-Windows-Zip
+        path: SpriteSize-Windows.zip
 
   # ================= СБОРКА ПОД LINUX =================
   build-linux:
     runs-on: ubuntu-latest
-
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -101,9 +101,46 @@ jobs:
         cp build/spritesize dist/
         cp build/spritesize_en.qm dist/
         cp build/spritesize_ru.qm dist/
+        # Упаковываем Linux-сборку в TAR.GZ archive
+        tar -czvf SpriteSize-Linux.tar.gz -C dist .
 
     - name: Upload Linux Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: SpriteSize-Linux
-        path: dist/
+        name: SpriteSize-Linux-Tar
+        path: SpriteSize-Linux.tar.gz
+
+  # ================= АВТОМАТИЧЕСКАЯ ПУБЛИКАЦИЯ РЕЛИЗА =================
+  create-release:
+    needs: [build-windows, build-linux] # Ждем окончания обеих сборок
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download Windows Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: SpriteSize-Windows-Zip
+
+    - name: Download Linux Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: SpriteSize-Linux-Tar
+
+    # Создаем официальный Релиз на главной странице и загружаем туда тяжелые файлы через API
+    - name: Deploy GitHub Release
+      uses: ncipollo/release-action@v1
+      with:
+        artifacts: "SpriteSize-Windows.zip,SpriteSize-Linux.tar.gz"
+        token: ${{ secrets.GITHUB_TOKEN }}
+        allowUpdates: true
+        tag: "v1.0.0"
+        name: "SpriteSize v1.0.0 (Stable)"
+        body: |
+          ### 🎉 Первый официальный релиз утилиты SpriteSize!
+          
+          Автоматическая кроссплатформенная сборка для геймдева.
+          
+          **Что внутри:**
+          * Пакетный ресайз изображений (Nearest Neighbor) для четкого Pixel-Art.
+          * Безопасная система бэкапов с временными метками.
+          * Интерактивный менеджер ассетов с предпросмотром на шахматном фоне.
+          * Динамическая локализация (RU/EN) на лету.

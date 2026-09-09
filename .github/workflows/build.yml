@@ -86,15 +86,37 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Remove Google Chrome repository
+      # GitHub runner содержит Google Chrome.
+      # Его репозиторий нам для сборки не нужен,
+      # а сейчас он может ломать apt update из-за
+      # Hash Sum mismatch.
+      - name: Disable Google Chrome apt repository
         shell: bash
         run: |
-          sudo rm -f /etc/apt/sources.list.d/google-chrome.list
-          sudo rm -f /etc/apt/sources.list.d/google-chrome.sources
+          echo "Searching for Google Chrome apt repositories..."
+
+          sudo grep -RIl "dl.google.com/linux/chrome" \
+            /etc/apt/sources.list \
+            /etc/apt/sources.list.d \
+            2>/dev/null \
+            | while read -r file; do
+              echo "Disabling: $file"
+              sudo mv "$file" "$file.disabled"
+            done
+
+          echo "Remaining Google repositories:"
+          sudo grep -RIn "dl.google.com" \
+            /etc/apt/sources.list \
+            /etc/apt/sources.list.d \
+            2>/dev/null || true
+
+      - name: Clean apt cache
+        run: |
+          sudo rm -rf /var/lib/apt/lists/*
+          sudo apt-get clean
 
       - name: Update apt
         run: |
-          sudo apt-get clean
           sudo apt-get update
 
       - name: Install build dependencies

@@ -18,6 +18,7 @@ int main(int argc, char *argv[])
     ImageProcessor processor;
     Translator translator(&engine, &processor);
 
+
     engine.rootContext()->setContextProperty("imageProcessor", &processor);
     engine.rootContext()->setContextProperty("appTranslator", &translator);
 

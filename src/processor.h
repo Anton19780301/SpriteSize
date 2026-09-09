@@ -26,8 +26,9 @@ public:
 
     Q_INVOKABLE void scanDirectory();
     Q_INVOKABLE void toggleAssetSelection(int index, bool selected);
-    Q_INVOKABLE void startProcessing(int targetWidth, int targetHeight, bool useNearestNeighbor);
     Q_INVOKABLE void setAllAssetsChecked(bool checked);
+    Q_INVOKABLE void startProcessing(int targetWidth, int targetHeight, bool useNearestNeighbor, const QString &targetFormat);
+
 
 signals:
     void inputPathChanged();
@@ -43,7 +44,8 @@ private:
     QVariantList m_assetModel;
     QString m_statusMessage = "Программа готова к работе";
 
-    void processTask(int targetWidth, int targetHeight, bool useNearestNeighbor);
+    void processTask(int targetWidth, int targetHeight, bool useNearestNeighbor, const QString &targetFormat);
+
 };
 
 #endif // PROCESSOR_H

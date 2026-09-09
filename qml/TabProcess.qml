@@ -55,6 +55,25 @@ Item {
                 model: ["64 x 64", "128 x 128", "256 x 256", qsTr("Свой размер")]
                 currentIndex: 0
             }
+
+            //Выбор выходного формата
+            RowLayout {
+                spacing: 15
+                Layout.fillWidth: true
+
+                Label {
+                    text: qsTr("Выходной формат:")
+                    font.pointSize: 10
+                    color: window.isDarkMode ? "#FFFFFF" : "#333333"
+                }
+
+                ComboBox {
+                    id: formatCombo
+                    Layout.preferredWidth: 150
+                    model: ["Original", "PNG", "WEBP", "JPG", "BMP"]
+                    currentIndex: 0
+                }
+            }
         }
 
         //Поля ручного ввода (появляются ТОЛЬКО если выбран пункт "Свой размер")
@@ -158,20 +177,15 @@ Item {
             onClicked: {
                 startBtn.text = qsTr("ОБРАБОТКА...")
 
-                let w = 64
-                let h = 64
-
-                // Вычисляем размеры на основе выбранного пресета
+                let w = 64, h = 64
                 if (sizePresetCombo.currentIndex === 0) { w = 64; h = 64; }
                 else if (sizePresetCombo.currentIndex === 1) { w = 128; h = 128; }
                 else if (sizePresetCombo.currentIndex === 2) { w = 256; h = 256; }
-                else {
-                    w = parseInt(customWidth.text)
-                    h = parseInt(customHeight.text)
-                }
+                else { w = parseInt(customWidth.text); h = parseInt(customHeight.text); }
 
-                // Передаем параметры в наше тяжелое C++ ядро
-                imageProcessor.startProcessing(w, h, nearestNeighborCheck.checked)
+                let selectedFormat = formatCombo.currentText.toUpperCase()
+
+                imageProcessor.startProcessing(w, h, nearestNeighborCheck.checked, selectedFormat)
             }
         }
     }

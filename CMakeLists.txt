@@ -51,6 +51,14 @@ qt_add_qml_module(spritesize
         qml/AssetList.qml
 )
 
+if(NOT TARGET Qt6::QImageFormatsPlugin)
+    add_library(Qt6::QImageFormatsPlugin MODULE IMPORTED)
+    # Используем твой физический путь (симлинк C:\Qt)
+    set_target_properties(Qt6::QImageFormatsPlugin PROPERTIES
+        IMPORTED_LOCATION "C:/Qt/6.11.2/mingw_64/plugins/imageformats/qwebp.dll" # или qtiff.dll, подставится вся папка
+    )
+endif()
+
 target_link_libraries(spritesize PRIVATE
     Qt6::Core
     Qt6::Gui
@@ -58,6 +66,7 @@ target_link_libraries(spritesize PRIVATE
     Qt6::Quick
     Qt6::QuickControls2
     Qt6::Concurrent
+
 )
 
 if(WIN32)

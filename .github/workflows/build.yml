@@ -26,14 +26,15 @@ jobs:
         python -m pip install --upgrade pip setuptools wheel
         python -m pip install aqtinstall
 
+    # Найдите этот блок в .github/workflows/build.yml и обновите строку arch:
     - name: Install Qt
       uses: jurplel/install-qt-action@v3
       with:
         version: '6.8.0' 
         host: 'windows'
         target: 'desktop'
-        # ИСПРАВЛЕНО: Меняем на msvc2022. Линкер Microsoft намертво защищен от ошибок MinGW GCC!
-        arch: 'win64_msvc2022' 
+        # ИСПРАВЛЕНО: Убрали "2022", теперь имя архитектуры в базах Qt 6.8+ пишется просто как win64_msvc
+        arch: 'win64_msvc' 
         modules: '' 
 
     - name: Create build directory

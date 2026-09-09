@@ -27,6 +27,7 @@ public:
     Q_INVOKABLE void startProcessing(int targetWidth, int targetHeight, bool useNearestNeighbor);
 
     QString statusMessage() const { return m_statusMessage; }
+    void setStatusMessage(const QString &message);
 
 signals:
     void inputPathChanged();

@@ -128,3 +128,10 @@ void ImageProcessor::startProcessing(int targetWidth, int targetHeight, bool use
     emit processingFinished(processedCount, tr("Обработка успешно завершена!"));
     scanDirectory();
 }
+
+void ImageProcessor::setStatusMessage(const QString &message) {
+    if (m_statusMessage != message) {
+        m_statusMessage = message;
+        emit statusMessageChanged();
+    }
+}

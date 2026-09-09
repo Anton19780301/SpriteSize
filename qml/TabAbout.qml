@@ -10,12 +10,11 @@ Item {
         anchors.margins: 40
         spacing: 15
 
-        // Логотип/Название проекта
         Label {
             text: "SpriteSize"
             font.bold: true
             font.pointSize: 24
-            color: "#0d6efd" // Красивый геймдев-синий цвет
+            color: "#0d6efd"
             Layout.alignment: Qt.AlignHCenter
         }
 
@@ -47,7 +46,8 @@ Item {
             text: qsTr("SpriteSize — это легковесная и быстрая утилита для пакетного сжатия текстур, созданная специально для инди-разработчиков и игровых дизайнеров. Она позволяет мгновенно оптимизировать тяжелые ИИ-арты высокого разрешения (1024х1024 и более) под размеры игровых спрайтов (например, 64х64) с использованием алгоритма «Ближайший сосед» для сохранения идеальной четкости пикселей.")
         }
 
-        Item { Layout.fillHeight: true } // Выталкивает кнопку к нижнему краю
+        //выравнивание
+        Item { Layout.fillHeight: true }
 
         // Кнопка ссылки на GitHub репозиторий
         Button {
@@ -73,9 +73,8 @@ Item {
                 border.color: "#24292e"
             }
 
-            // Открывает ссылку в стандартном браузере операционной системы
             onClicked: {
-                Qt.openUrlExternally("https://github.com")
+                Qt.openUrlExternally("https://github.com/Anton19780301/SpriteSize")
             }
         }
     }

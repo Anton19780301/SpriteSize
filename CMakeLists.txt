@@ -18,10 +18,24 @@ add_executable(SpriteSize
     src/translator.h
 )
 
-set(TS_FILES i18n/spritesize_en.ts i18n/spritesize_ru.ts)
-qt_add_translations(SpriteSize TS_FILES ${TS_FILES} QM_FILES_OUTPUT_VARIABLE QM_FILES)
+# --- БЛОК ПЕРЕВОДА ---
+set(TS_FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/i18n/spritesize_en.ts"
+    "${CMAKE_CURRENT_SOURCE_DIR}/i18n/spritesize_ru.ts"
+)
+
+
+qt_add_translations(SpriteSize
+    TS_FILES ${TS_FILES}
+    QM_FILES_OUTPUT_VARIABLE QM_FILES
+)
+
 if(QM_FILES)
     target_sources(SpriteSize PRIVATE ${QM_FILES})
+endif()
+
+if(TARGET Qt6::lupdate)
+    qt_add_lupdate(SpriteSize TS_FILES ${TS_FILES})
 endif()
 
 qt_add_qml_module(SpriteSize
@@ -35,7 +49,6 @@ qt_add_qml_module(SpriteSize
         qml/TabAbout.qml
         QML_FILES qml/AssetList.qml
 )
-
 
 target_link_libraries(SpriteSize PRIVATE
     Qt6::Core

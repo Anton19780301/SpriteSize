@@ -2,374 +2,247 @@ name: Build SpriteSize
 
 on:
   push:
-    branches:
-      - main
-
+    branches: ["main"]
   pull_request:
-    branches:
-      - main
-
+    branches: ["main"]
   workflow_dispatch:
 
+env:
+  QT_VERSION: "6.11.2"
 
 jobs:
-
-  # ============================================================
-  # WINDOWS
-  # ============================================================
   build-windows:
+    name: Build Windows
     runs-on: windows-latest
 
     steps:
-
-      # --------------------------------------------------------
-      # Checkout
-      # --------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-
-      # --------------------------------------------------------
-      # MSVC
-      # --------------------------------------------------------
-      - name: Setup MSVC
-        uses: ilammy/msvc-dev-cmd@v1
-
-
-      # --------------------------------------------------------
-      # Install Qt 6.11.2
-      #
-      # Используем fork aqtinstall, потому что официальный
-      # aqtinstall 3.3.0 пока имеет проблему с новой структурой
-      # репозитория Qt 6.11.x.
-      # --------------------------------------------------------
-      - name: Install Qt 6.11.2
-        uses: jurplel/install-qt-action@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          version: "6.11.2"
-          host: windows
-          target: desktop
-          arch: win64_msvc2022_64
+          python-version: "3.12"
 
-          archives: "qtbase qtdeclarative qttools"
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
 
-          aqtsource: "git+https://github.com/Holt59/aqtinstall.git"
-
-          cache: true
-
-
-      # --------------------------------------------------------
-      # Проверяем Qt
-      # --------------------------------------------------------
-      - name: Check Qt installation
+      - name: Install aqtinstall
         shell: pwsh
         run: |
-          Write-Host "QT_ROOT_DIR = $env:QT_ROOT_DIR"
+          python -m pip install --upgrade pip
+          python -m pip install git+https://github.com/miurahr/aqtinstall.git@master
 
-          Write-Host ""
-          Write-Host "qmake:"
-          qmake --version
+          Write-Host "aqt version:"
+          python -m aqt version
 
-          Write-Host ""
-          Write-Host "CMake:"
-          cmake --version
-
-          Write-Host ""
-          Write-Host "windeployqt:"
-          where.exe windeployqt
-
-
-      # --------------------------------------------------------
-      # Configure CMake
-      # --------------------------------------------------------
-      - name: Configure CMake
-        run: |
-          cmake -S . -B build `
-            -G "Visual Studio 17 2022" `
-            -A x64 `
-            -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
-
-
-      # --------------------------------------------------------
-      # Build
-      # --------------------------------------------------------
-      - name: Build application
-        run: |
-          cmake --build build `
-            --config Release `
-            --parallel
-
-
-      # --------------------------------------------------------
-      # Prepare Windows distribution
-      # --------------------------------------------------------
-      - name: Deploy Qt libraries
+      - name: Install Qt
         shell: pwsh
         run: |
+          $qtRoot = "$env:GITHUB_WORKSPACE\Qt"
 
-          New-Item `
-            -ItemType Directory `
-            -Force `
-            -Path dist | Out-Null
+          python -m aqt install-qt `
+            windows desktop $env:QT_VERSION win64_msvc2022_64 `
+            --outputdir "$qtRoot" `
+            --archives qtbase qtdeclarative qttools
 
+          $qtDir = "$qtRoot\$env:QT_VERSION\msvc2022_64"
 
-          Write-Host "Deploying Qt libraries..."
-
-          windeployqt `
-            --release `
-            --qmldir "${{ github.workspace }}/qml" `
-            --dir dist `
-            "build/Release/spritesize.exe"
-
-
-          Write-Host "Copying application..."
-
-          Copy-Item `
-            "build/Release/spritesize.exe" `
-            "dist/spritesize.exe"
-
-
-          Write-Host "Searching for translation files..."
-
-          Get-ChildItem `
-            -Path build `
-            -Filter "*.qm" `
-            -Recurse `
-            -ErrorAction SilentlyContinue |
-          ForEach-Object {
-
-            Write-Host "Copying:"
-            Write-Host $_.FullName
-
-            Copy-Item `
-              $_.FullName `
-              "dist/"
+          if (!(Test-Path "$qtDir\bin\qt-cmake.bat")) {
+              Write-Error "Qt installation failed: qt-cmake.bat not found"
           }
 
+          if (!(Test-Path "$qtDir\bin\windeployqt.exe")) {
+              Write-Error "Qt installation failed: windeployqt.exe not found"
+          }
 
-          Write-Host ""
-          Write-Host "Windows distribution:"
-          Get-ChildItem -Recurse dist
+          "QT_ROOT_DIR=$qtDir" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "$qtDir\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
 
+          Write-Host "QT_ROOT_DIR=$qtDir"
 
-      # --------------------------------------------------------
-      # Upload Windows artifact
-      # --------------------------------------------------------
-      - name: Upload Windows artifact
+      - name: Verify Qt
+        shell: pwsh
+        run: |
+          python -m aqt version
+          & "$env:QT_ROOT_DIR\bin\qmake.exe" --version
+          & "$env:QT_ROOT_DIR\bin\cmake.exe" --version
+
+      - name: Configure CMake
+        shell: pwsh
+        run: |
+          & "$env:QT_ROOT_DIR\bin\qt-cmake.bat" `
+            -S . `
+            -B build `
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build Application
+        shell: pwsh
+        run: |
+          cmake --build build --config Release --parallel
+
+      - name: Deploy Windows Application
+        shell: pwsh
+        run: |
+          $exe = "$env:GITHUB_WORKSPACE\build\Release\spritesize.exe"
+
+          if (!(Test-Path $exe)) {
+              Write-Error "Executable not found: $exe"
+          }
+
+          & "$env:QT_ROOT_DIR\bin\windeployqt.exe" `
+            --release `
+            --qmldir "$env:GITHUB_WORKSPACE\qml" `
+            "$exe"
+
+      - name: Collect Windows translations
+        shell: pwsh
+        run: |
+          $qmFiles = Get-ChildItem `
+            -Path "$env:GITHUB_WORKSPACE\build" `
+            -Filter "*.qm" `
+            -Recurse `
+            -File
+
+          if ($qmFiles.Count -eq 0) {
+              Write-Warning "No .qm files found"
+          }
+          else {
+              foreach ($file in $qmFiles) {
+                  Copy-Item `
+                    $file.FullName `
+                    "$env:GITHUB_WORKSPACE\build\Release\" `
+                    -Force
+              }
+          }
+
+      - name: Upload Windows Artifact
         uses: actions/upload-artifact@v4
         with:
           name: SpriteSize-Windows
-          path: dist/
+          path: build/Release/
 
 
-  # ============================================================
-  # LINUX
-  # ============================================================
   build-linux:
-    runs-on: ubuntu-24.04
+    name: Build Linux
+    runs-on: ubuntu-latest
 
     steps:
-
-      # --------------------------------------------------------
-      # Checkout
-      # --------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-      # --------------------------------------------------------
-      # Disable broken Google Chrome repository
-      # --------------------------------------------------------
-      - name: Disable Google Chrome apt repository
+      - name: Disable broken Chrome apt repository
         shell: bash
         run: |
+          sudo rm -f /etc/apt/sources.list.d/google-chrome.list
+          sudo rm -f /etc/apt/sources.list.d/google-chrome.list.save
 
-          echo "Searching for Google Chrome apt repositories..."
-
-          sudo grep -RIl "dl.google.com/linux/chrome" \
-            /etc/apt/sources.list \
-            /etc/apt/sources.list.d \
-            2>/dev/null |
-          while read -r file; do
-
-            echo "Disabling:"
-            echo "$file"
-
-            sudo mv "$file" "$file.disabled"
-
-          done
-
-
-          echo ""
-          echo "Remaining Google repositories:"
-
-          sudo grep -RIn "dl.google.com" \
-            /etc/apt/sources.list \
-            /etc/apt/sources.list.d \
-            2>/dev/null || true
-
-
-      # --------------------------------------------------------
-      # Clean apt
-      # --------------------------------------------------------
-      - name: Clean apt cache
-        run: |
-          sudo rm -rf /var/lib/apt/lists/*
           sudo apt-get clean
+          sudo rm -rf /var/lib/apt/lists/*
 
-
-      # --------------------------------------------------------
-      # Update apt
-      # --------------------------------------------------------
-      - name: Update apt
+      - name: Install system dependencies
+        shell: bash
         run: |
           sudo apt-get update
-
-
-      # --------------------------------------------------------
-      # Linux dependencies
-      # --------------------------------------------------------
-      - name: Install Linux dependencies
-        run: |
           sudo apt-get install -y \
             build-essential \
-            libgl1-mesa-dev \
-            libxkbcommon-dev \
-            libxkbcommon-x11-dev
+            cmake \
+            ninja-build \
+            p7zip-full
 
-
-      # --------------------------------------------------------
-      # Install Qt 6.11.2
-      # --------------------------------------------------------
-      - name: Install Qt 6.11.2
-        uses: jurplel/install-qt-action@v4
-        with:
-          version: "6.11.2"
-          host: linux
-          target: desktop
-
-          archives: "qtbase qtdeclarative qttools"
-
-          cache: true
-
-
-      # --------------------------------------------------------
-      # IMPORTANT:
-      # Qt 6.11.2 contains its own ICU libraries.
-      #
-      # Добавляем и Qt root, и Qt/lib в runtime search path.
-      # --------------------------------------------------------
-      - name: Configure Qt runtime paths
+      - name: Install aqtinstall
         shell: bash
         run: |
+          python -m pip install --upgrade pip
+          python -m pip install git+https://github.com/miurahr/aqtinstall.git@master
 
-          echo "QT_ROOT_DIR=$QT_ROOT_DIR"
+          echo "aqt version:"
+          python -m aqt version
 
-          echo "LD_LIBRARY_PATH before:"
-          echo "$LD_LIBRARY_PATH"
-
-          echo "LD_LIBRARY_PATH=$QT_ROOT_DIR:$QT_ROOT_DIR/lib:$LD_LIBRARY_PATH" \
-            >> "$GITHUB_ENV"
-
-          echo "PATH=$QT_ROOT_DIR/bin:$PATH" \
-            >> "$GITHUB_ENV"
-
-          echo ""
-          echo "Qt files:"
-
-          ls -la "$QT_ROOT_DIR" || true
-
-          echo ""
-          echo "ICU libraries:"
-
-          find "$QT_ROOT_DIR" \
-            -maxdepth 2 \
-            -type f \
-            -name "libicu*.so*" \
-            -print || true
-
-
-      # --------------------------------------------------------
-      # Check Qt
-      # --------------------------------------------------------
-      - name: Check Qt installation
+      - name: Install Qt
         shell: bash
         run: |
+          QT_ROOT="$GITHUB_WORKSPACE/Qt"
 
+          python -m aqt install-qt \
+            linux desktop "$QT_VERSION" gcc_64 \
+            --outputdir "$QT_ROOT" \
+            --archives qtbase qtdeclarative qttools \
+            --external 7z
+
+          QT_DIR="$QT_ROOT/$QT_VERSION/gcc_64"
+
+          if [ ! -f "$QT_DIR/bin/qt-cmake" ]; then
+            echo "Qt installation failed: qt-cmake not found"
+            exit 1
+          fi
+
+          if [ ! -f "$QT_DIR/bin/moc" ]; then
+            echo "Qt installation failed: moc not found"
+            exit 1
+          fi
+
+          if [ ! -f "$QT_DIR/lib/libicui18n.so.73" ]; then
+            echo "Qt installation failed: libicui18n.so.73 not found"
+            echo "Searching for ICU files:"
+            find "$QT_DIR" -name "libicu*.so*" -print || true
+            exit 1
+          fi
+
+          echo "QT_ROOT_DIR=$QT_DIR" >> "$GITHUB_ENV"
+          echo "$QT_DIR/bin" >> "$GITHUB_PATH"
+          echo "LD_LIBRARY_PATH=$QT_DIR/lib:$QT_DIR:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+
+      - name: Verify Qt
+        shell: bash
+        run: |
           echo "QT_ROOT_DIR=$QT_ROOT_DIR"
-
-          echo ""
           echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
 
-          echo ""
-          echo "Qt version:"
+          python -m aqt version
 
-          qmake --version
+          "$QT_ROOT_DIR/bin/qt-cmake" --version
 
-          echo ""
-          echo "CMake version:"
+          echo "ICU files:"
+          ls -la "$QT_ROOT_DIR/lib"/libicu*.so* || true
 
-          cmake --version
+          echo "moc dependencies:"
+          ldd "$QT_ROOT_DIR/bin/moc" || true
 
-
-      # --------------------------------------------------------
-      # Configure CMake
-      # --------------------------------------------------------
       - name: Configure CMake
+        shell: bash
         run: |
-          cmake -S . -B build \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR"
+          "$QT_ROOT_DIR/bin/qt-cmake" \
+            -S . \
+            -B build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release
 
-
-      # --------------------------------------------------------
-      # Build
-      # --------------------------------------------------------
-      - name: Build application
+      - name: Build Application
+        shell: bash
         run: |
-          cmake --build build \
-            --config Release \
-            --parallel
+          cmake --build build --parallel
 
-
-      # --------------------------------------------------------
-      # Prepare Linux distribution
-      # --------------------------------------------------------
       - name: Prepare Linux package
         shell: bash
         run: |
-
           mkdir -p dist
 
-
-          echo "Copy executable..."
-
-          cp build/spritesize \
-             dist/spritesize
-
-
-          echo ""
-          echo "Searching for QM files..."
+          cp build/spritesize dist/
 
           find build \
             -type f \
             -name "*.qm" \
             -exec cp {} dist/ \;
 
-
-          echo ""
-          echo "Linux distribution:"
-
-          find dist \
-            -maxdepth 2 \
-            -type f \
-            -print
-
-
-      # --------------------------------------------------------
-      # Upload Linux artifact
-      # --------------------------------------------------------
-      - name: Upload Linux artifact
+      - name: Upload Linux Artifact
         uses: actions/upload-artifact@v4
         with:
           name: SpriteSize-Linux

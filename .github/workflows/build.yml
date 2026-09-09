@@ -8,7 +8,7 @@ on:
   workflow_dispatch: 
 
 jobs:
-  # ================= СБОРКА ПОД WINDOWS (СТАБИЛЬНЫЙ MSVC) =================
+  # ================= СБОРКА ПОД WINDOWS (БЫСТРЫЙ И НАДЕЖНЫЙ VCPKG) =================
   build-windows:
     runs-on: windows-latest
 
@@ -16,26 +16,14 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # Инициализируем компилятор MSVC, встроенный в Windows-сервер по умолчанию
     - name: Set up MSVC Developer Command Prompt
       uses: ilammy/msvc-dev-cmd@v1
 
-    # Обходим баг прав доступа WindowsApps/python.EXE
-    - name: Pre-install aqtinstall
+    # Устанавливаем ГОТОВЫЕ БИНАРНИКИ Qt6 через vcpkg. 
+    # Флаг :x64-windows означает динамическую сборку (shared). Она скачивается за пару минут БЕЗ компиляции!
+    - name: Install Pre-compiled Qt6 via vcpkg
       run: |
-        python -m pip install --upgrade pip setuptools wheel
-        python -m pip install aqtinstall
-
-    # Найдите этот блок в .github/workflows/build.yml и обновите строку arch:
-    - name: Install Qt
-      uses: jurplel/install-qt-action@v3
-      with:
-        version: '6.8.0' 
-        host: 'windows'
-        target: 'desktop'
-        # ИСПРАВЛЕНО: Убрали "2022", теперь имя архитектуры в базах Qt 6.8+ пишется просто как win64_msvc
-        arch: 'win64_msvc' 
-        modules: '' 
+        vcpkg install qtbase:x64-windows qtdeclarative:x64-windows qtlanguageserver:x64-windows qttools:x64-windows
 
     - name: Create build directory
       run: mkdir build
@@ -43,19 +31,23 @@ jobs:
     - name: Configure CMake
       run: |
         cd build
-        # CMake автоматически выберет MSVC компилятор вместо капризного MinGW
-        cmake -DCMAKE_BUILD_TYPE=Release ..
+        # Подключаем vcpkg-тулчейн, чтобы CMake сразу увидел скачанный Qt6
+        cmake -DCMAKE_BUILD_TYPE=Release `
+              -DCMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake" ..
 
     - name: Build Application
       run: |
         cd build
         cmake --build . --config Release
 
-    - name: Deploy Windows Binary (windeployqt)
+    - name: Deploy Windows Binary
       run: |
         cd build
-        # windeployqt соберет все нужные .dll под MSVC в папку релиза
-        windeployqt --qmldir ../qml Release/spritesize.exe
+        # Находим windeployqt в папке vcpkg и автоматически упаковываем все нужные .dll
+        $vcpkgQtBin = "C:/vcpkg/packages/qtbase_x64-windows/tools/qt6/bin"
+        if (Test-Path "$vcpkgQtBin/windeployqt.exe") {
+            & "$vcpkgQtBin/windeployqt.exe" --qmldir ../qml Release/spritesize.exe
+        }
         copy spritesize_en.qm Release\
         copy spritesize_ru.qm Release\
 
@@ -65,7 +57,7 @@ jobs:
         name: SpriteSize-Windows
         path: build/Release/
 
-  # ================= СБОРКА ПОД LINUX (УЖЕ РАБОТАЕТ) =================
+  # ================= СБОРКА ПОД LINUX (РАБОТАЕТ ШТАТНО) =================
   build-linux:
     runs-on: ubuntu-latest
 

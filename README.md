@@ -1,110 +1,60 @@
-\# SpriteSize 🎮 🗜️
+# SpriteSize 🎮 🗜️
 
+Привет! **SpriteSize** — это простая десктопная софтина для инди-разработчиков и художников. 
 
+**Зачем она нужна?** Сейчас все вовсю генерируют графику через нейронки (Midjourney, Stable Diffusion), но на выходе получаются тяжелые картинки 1024x1024. Чтобы закинуть их в Unity, Godot или Defold в качестве спрайтов, их нужно быстро ужать до 64x64, 128x128 и т.д. Если делать это стандартными методами, пиксели размываются в кашу. SpriteSize решает эту проблему в пару кликов, сохраняя текстуры четкими.
 
-\*\*SpriteSize\*\* is a lightweight, high-performance desktop utility designed for indie game developers and digital artists. It solves a common modern geymdev pain point: quickly downscaling heavy, high-resolution AI-generated artwork (e.g., 1024x1024) into optimal game-ready sprite dimensions (64x64, 128x128, etc.) while keeping pixels perfectly sharp.
+Приложение написано на **C++17** и **Qt 6 (QML Quick Controls 2)**. Интерфейс отзывчивый, ничего не лагает.
 
+---
 
+## 🔥 Что умеет (без лишней воды)
 
-Built natively with \*\*C++17\*\* and \*\*Qt 6 / QML Quick Controls 2\*\*, the app features a sleek modern workflow, robust architecture, and production-ready safety mechanisms.
+* **⚡ Не виснет намертво:** За замену размера отвечает `QtConcurrent`. Вы можете закинуть сотню картинок, интерфейс не превратится в «Приложение не отвечает», а будет плавно показывать прогресс-бар.
+* **👾 Не мылит пиксель-арт:** Есть специальный режим (Nearest-Neighbor / `Qt::FastTransformation`). Он уменьшает картинки без дурацкого сглаживания — идеально для 2D-игр.
+* **📦 Параноидальные бэкапы:** При пакетной обработке софтина сама создает папку вида `_backup_YYYYMMDD_HHMMSS` и прячет туда оригиналы. Шанс случайно перезаписать и уничтожить исходники равен нулю.
+* **👁️ Удобный просмотр:** Встроенный менеджер папок с чекбоксами. Кликаете по картинке — она тут же показывается на правильном «шахматном» фоне для проверки прозрачности.
+* **🌐 Смена языка на лету:** Можно переключать интерфейс (Русский / Английский) прямо в настройках. Никаких перезапусков приложения не требуется.
 
+---
 
+## 🛠️ На чем сделано
 
-\---
+* **Язык:** C++17 для тяжелой логики + QML/JS для интерфейса.
+* **Пакет:** Qt 6.10+ (Core, Gui, Qml, Quick, Concurrent, LinguistTools).
+* **Система сборки:** CMake.
 
+---
 
+## 🚀 Как собрать из исходников
 
-\## ✨ Key Features
+*Так как у Qt6 есть свои приколы с плагинами изображений в CMake, сборка настроена особым образом, чтобы вам не пришлось три часа гуглить ошибки.*
 
+### Что нужно:
+* Windows 10 / 11
+* Qt SDK 6.10+ (тестировалось на MinGW)
+* CMake 3.16+
+* Установленный компонент **Qt Image Formats** в системе.
 
+### Погнали:
 
-\*   \*\*⚡ Non-Blocking Multithreading:\*\* Heavy image processing tasks are entirely offloaded to background threads using `QtConcurrent`. The GUI remains 100% responsive, showcasing a smooth real-time progress bar.
+1. Клонируем репозиторий:
+   ```bash
+   git clone https://github.com
+   cd SpriteSize
+   ```
 
-\*   \*\*👾 Nearest-Neighbor Filtration:\*\* Includes a dedicated "Pixel-Art" mode (`Qt::FastTransformation`) to downscale textures without blurs or artifacts—critical for clean Godot/Unity 2D rendering.
+2. Открываем `CMakeLists.txt` в **Qt Creator**.
+3. **Важно:** Убедитесь, что в `CMakeLists.txt` в блоке `IMPORTED_LOCATION` указан правильный путь к вашей папке Qt (по умолчанию настроено под симлинк `C:/Qt`).
+4. Нажмите `Build` -> `Clear CMake Cache and Reconfigure` (Очистить кэш CMake и перезапустить настройку).
+5. Жмем **Ctrl + R** и запускаем!
 
-\*   \*\*📦 Time-Stamped Automatic Backups:\*\* Every batch operation automatically seals clean original assets inside a safe, unique `\_backup\_YYYYMMDD\_HHMMSS` directory. Zero chance of accidentally destroying raw assets.
+*После сборки скомпилированные файлы переводов (`.qm`) автоматически подтягиваются в папку с бинарником.*
 
-\*   \*\*👁️ Interactive Asset Manager \& Preview:\*\* Live folder scanning outputs a list of matching images with reactive checkboxes. Select a file to view it instantly over an advanced Canvas-drawn transparency checkerboard.
+---
 
-\*   \*\*🌐 Real-Time Dynamic Localization:\*\* Swap interface languages on-the-fly (English / Russian) from the settings tab. Translations are smoothly updated across all components without app restarts.
+## 📄 Лицензия и пара слов от автора
 
+Проект распространяется под открытой лицензией **MIT** — делайте с кодом что хотите, можете использовать в коммерции.
 
-
-\---
-
-
-
-\## 🛠️ Technical Stack \& Architecture
-
-
-
-\*   \*\*Language:\*\* C++17 (Core Logic) + QML / JavaScript (UI Layer)
-
-\*   \*\*Framework:\*\* Qt 6.10+ (Core, Gui, Qml, Quick, QuickControls2, Concurrent, LinguistTools)
-
-\*   \*\*Build System:\*\* CMake (Optimized for decoupled asset pipeline target structures)
-
-\*   \*\*Design Pattern:\*\* Clean Separation of Concerns via C++ Context Properties injection into declarative QML layouts.
-
-
-
-\---
-
-
-
-\## 🚀 Getting Started (Building from Source)
-
-
-
-\### Prerequisites
-
-\*   Windows 10 / 11
-
-\*   Qt SDK 6.5 or newer (Tested up to Qt 6.10.1 MinGW)
-
-\*   CMake 3.16+
-
-
-
-\### Compilation Steps
-
-1\. Clone the repository:
-
-&#x20;  ```bash
-
-&#x20;  git clone https://github.com
-
-&#x20;  cd SpriteSize
-
-&#x20;  ```
-
-2\. Open the `CMakeLists.txt` file directly in \*\*Qt Creator\*\*.
-
-3\. Clear CMake Cache and Run CMake Configuration.
-
-4\. Hit \*\*Ctrl + R\*\* to compile and run the application!
-
-
-
-\*Note on Localizations:\* The compiled binary automatically looks for physical `spritesize\_en.qm` and `spritesize\_ru.qm` translation sheets inside the application executable path directory.
-
-
-
-\---
-
-
-
-\## 📄 License \& Crediting Request
-
-
-
-This utility is distributed completely free under the \*\*MIT License\*\* — see the \[LICENSE](LICENSE) file for details.
-
-
-
-\### 🎮 Note for Game Developers
-
-While the MIT license only legally requires keeping the copyright notices in the raw software files, if you actively use \*\*SpriteSize\*\* to optimize pipelines for a commercial or open-source game project, I would highly appreciate a small mention in your game's final credits! \*(e.g., "Special Thanks / Asset Tools: SpriteSize by Anton")\*. It costs nothing but greatly helps an indie engineer's portfolio!
-
-
-
+**Маленькая просьба:** Юридически лицензия требует только сохранения копирайта в исходниках. Но если SpriteSize реально сэкономит вам кучу времени и поможет оптимизировать пайплайн для вашей игры — черканите меня где-нибудь в финальных титрах *(например: "Особая благодарность / Asset Tools: SpriteSize by Anton")*. Вам не сложно, а мне для инди-портфолио огромный плюс! Спасибо 🤝

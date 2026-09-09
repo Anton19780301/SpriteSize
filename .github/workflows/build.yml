@@ -1,72 +1,279 @@
-build-linux:
-  runs-on: ubuntu-24.04
+name: Build SpriteSize
 
-  steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+on:
+  push:
+    branches: ["main"]
 
-    - name: Disable Google Chrome apt repository
-      shell: bash
-      run: |
-        sudo grep -RIl "dl.google.com/linux/chrome" \
-          /etc/apt/sources.list \
-          /etc/apt/sources.list.d \
-          2>/dev/null \
-          | while read -r file; do
-            echo "Disabling: $file"
-            sudo mv "$file" "$file.disabled"
-          done
+  pull_request:
+    branches: ["main"]
 
-    - name: Clean apt
-      run: |
-        sudo rm -rf /var/lib/apt/lists/*
-        sudo apt-get clean
-        sudo apt-get update
+  workflow_dispatch:
 
-    - name: Install Linux dependencies
-      run: |
-        sudo apt-get install -y \
-          build-essential \
-          libgl1-mesa-dev \
-          libxkbcommon-dev \
-          libxkbcommon-x11-dev
 
-    - name: Install Qt 6.11
-      uses: jurplel/install-qt-action@v4
-      with:
-        version: "6.11.2"
-        host: linux
-        target: desktop
-        archives: "qtbase qtdeclarative qttools"
-        cache: true
+jobs:
 
-    - name: Show Qt
-      run: |
-        qmake --version || true
-        echo "QT_ROOT_DIR=$QT_ROOT_DIR"
+  # ============================================================
+  # WINDOWS
+  # ============================================================
+  build-windows:
+    runs-on: windows-latest
 
-    - name: Configure CMake
-      run: |
-        cmake -S . -B build \
-          -DCMAKE_BUILD_TYPE=Release
+    steps:
+      # --------------------------------------------------------
+      # Checkout
+      # --------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Build
-      run: |
-        cmake --build build \
-          --config Release \
-          --parallel
+      # --------------------------------------------------------
+      # MSVC
+      # --------------------------------------------------------
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
 
-    - name: Prepare Linux package
-      shell: bash
-      run: |
-        mkdir -p dist
+      # --------------------------------------------------------
+      # Qt 6.11.2
+      # --------------------------------------------------------
+      - name: Install Qt 6.11.2
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.11.2"
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
 
-        cp build/spritesize dist/
+          # Базовый Qt + QML/Quick + Qt Linguist
+          archives: "qtbase qtdeclarative qttools"
 
-        find build -name "*.qm" -exec cp {} dist/ \;
+          cache: true
 
-    - name: Upload Linux artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: SpriteSize-Linux
-        path: dist/
+      # --------------------------------------------------------
+      # Show Qt information
+      # --------------------------------------------------------
+      - name: Show Qt information
+        shell: pwsh
+        run: |
+          Write-Host "QT_ROOT_DIR = $env:QT_ROOT_DIR"
+          Write-Host "Qt version:"
+          qmake --version
+
+          Write-Host "windeployqt:"
+          where.exe windeployqt
+
+      # --------------------------------------------------------
+      # Configure CMake
+      # --------------------------------------------------------
+      - name: Configure CMake
+        run: |
+          cmake -S . -B build `
+            -G "Visual Studio 17 2022" `
+            -A x64 `
+            -DCMAKE_BUILD_TYPE=Release
+
+      # --------------------------------------------------------
+      # Build
+      # --------------------------------------------------------
+      - name: Build application
+        run: |
+          cmake --build build `
+            --config Release `
+            --parallel
+
+      # --------------------------------------------------------
+      # Prepare Windows distribution
+      # --------------------------------------------------------
+      - name: Deploy Qt libraries
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+
+          Write-Host "Deploying Qt..."
+
+          windeployqt `
+            --release `
+            --qmldir "${{ github.workspace }}/qml" `
+            --dir dist `
+            "build/Release/spritesize.exe"
+
+          Write-Host "Copying executable..."
+
+          Copy-Item `
+            "build/Release/spritesize.exe" `
+            "dist/spritesize.exe"
+
+          Write-Host "Searching for translation files..."
+
+          Get-ChildItem `
+            -Path build `
+            -Filter "*.qm" `
+            -Recurse `
+            -ErrorAction SilentlyContinue |
+            ForEach-Object {
+              Write-Host "Copying $($_.FullName)"
+              Copy-Item $_.FullName "dist/"
+            }
+
+          Write-Host "Distribution contents:"
+          Get-ChildItem -Recurse dist
+
+      # --------------------------------------------------------
+      # Upload artifact
+      # --------------------------------------------------------
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpriteSize-Windows
+          path: dist/
+
+
+  # ============================================================
+  # LINUX
+  # ============================================================
+  build-linux:
+    runs-on: ubuntu-24.04
+
+    steps:
+      # --------------------------------------------------------
+      # Checkout
+      # --------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # --------------------------------------------------------
+      # Disable Google Chrome apt repository
+      #
+      # Иногда runner содержит активный репозиторий Chrome,
+      # который ломает apt-get update через Hash Sum mismatch.
+      # Нам Chrome для сборки SpriteSize не нужен.
+      # --------------------------------------------------------
+      - name: Disable Google Chrome apt repository
+        shell: bash
+        run: |
+          echo "Searching for Google Chrome repositories..."
+
+          sudo grep -RIl "dl.google.com/linux/chrome" \
+            /etc/apt/sources.list \
+            /etc/apt/sources.list.d \
+            2>/dev/null \
+            | while read -r file; do
+
+              echo "Disabling repository: $file"
+
+              sudo mv "$file" "$file.disabled"
+            done
+
+          echo ""
+          echo "Remaining Google repositories:"
+
+          sudo grep -RIn "dl.google.com" \
+            /etc/apt/sources.list \
+            /etc/apt/sources.list.d \
+            2>/dev/null || true
+
+      # --------------------------------------------------------
+      # Clean APT cache
+      # --------------------------------------------------------
+      - name: Clean apt cache
+        run: |
+          sudo rm -rf /var/lib/apt/lists/*
+          sudo apt-get clean
+
+      # --------------------------------------------------------
+      # Update APT
+      # --------------------------------------------------------
+      - name: Update apt
+        run: |
+          sudo apt-get update
+
+      # --------------------------------------------------------
+      # System dependencies
+      # --------------------------------------------------------
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get install -y \
+            build-essential \
+            libgl1-mesa-dev \
+            libxkbcommon-dev \
+            libxkbcommon-x11-dev
+
+      # --------------------------------------------------------
+      # Install Qt 6.11.2
+      # --------------------------------------------------------
+      - name: Install Qt 6.11.2
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.11.2"
+          host: linux
+          target: desktop
+
+          # Базовый Qt + QML/Quick + Qt Linguist
+          archives: "qtbase qtdeclarative qttools"
+
+          cache: true
+
+      # --------------------------------------------------------
+      # Show Qt information
+      # --------------------------------------------------------
+      - name: Show Qt information
+        shell: bash
+        run: |
+          echo "QT_ROOT_DIR = $QT_ROOT_DIR"
+
+          echo "Qt version:"
+          qmake --version
+
+          echo ""
+          echo "Qt binaries:"
+          find "$QT_ROOT_DIR" -maxdepth 3 -type f \
+            \( -name "qmake" -o -name "qml" \) \
+            2>/dev/null || true
+
+      # --------------------------------------------------------
+      # Configure CMake
+      # --------------------------------------------------------
+      - name: Configure CMake
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release
+
+      # --------------------------------------------------------
+      # Build
+      # --------------------------------------------------------
+      - name: Build application
+        run: |
+          cmake --build build \
+            --config Release \
+            --parallel
+
+      # --------------------------------------------------------
+      # Prepare Linux distribution
+      # --------------------------------------------------------
+      - name: Prepare Linux package
+        shell: bash
+        run: |
+          mkdir -p dist
+
+          echo "Copying executable..."
+
+          cp build/spritesize dist/
+
+          echo "Searching for translation files..."
+
+          find build \
+            -type f \
+            -name "*.qm" \
+            -exec cp {} dist/ \;
+
+          echo ""
+          echo "Distribution contents:"
+
+          find dist -maxdepth 2 -type f -print
+
+      # --------------------------------------------------------
+      # Upload artifact
+      # --------------------------------------------------------
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpriteSize-Linux
+          path: dist/

@@ -2,10 +2,12 @@ name: Build SpriteSize
 
 on:
   push:
-    branches: ["main"]
+    branches:
+      - main
 
   pull_request:
-    branches: ["main"]
+    branches:
+      - main
 
   workflow_dispatch:
 
@@ -19,11 +21,13 @@ jobs:
     runs-on: windows-latest
 
     steps:
+
       # --------------------------------------------------------
       # Checkout
       # --------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
+
 
       # --------------------------------------------------------
       # MSVC
@@ -31,8 +35,13 @@ jobs:
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
 
+
       # --------------------------------------------------------
-      # Qt 6.11.2
+      # Install Qt 6.11.2
+      #
+      # Используем fork aqtinstall, потому что официальный
+      # aqtinstall 3.3.0 пока имеет проблему с новой структурой
+      # репозитория Qt 6.11.x.
       # --------------------------------------------------------
       - name: Install Qt 6.11.2
         uses: jurplel/install-qt-action@v4
@@ -42,23 +51,33 @@ jobs:
           target: desktop
           arch: win64_msvc2022_64
 
-          # Базовый Qt + QML/Quick + Qt Linguist
           archives: "qtbase qtdeclarative qttools"
+
+          aqtsource: "git+https://github.com/Holt59/aqtinstall.git"
 
           cache: true
 
+
       # --------------------------------------------------------
-      # Show Qt information
+      # Проверяем Qt
       # --------------------------------------------------------
-      - name: Show Qt information
+      - name: Check Qt installation
         shell: pwsh
         run: |
           Write-Host "QT_ROOT_DIR = $env:QT_ROOT_DIR"
-          Write-Host "Qt version:"
+
+          Write-Host ""
+          Write-Host "qmake:"
           qmake --version
 
+          Write-Host ""
+          Write-Host "CMake:"
+          cmake --version
+
+          Write-Host ""
           Write-Host "windeployqt:"
           where.exe windeployqt
+
 
       # --------------------------------------------------------
       # Configure CMake
@@ -68,7 +87,8 @@ jobs:
           cmake -S . -B build `
             -G "Visual Studio 17 2022" `
             -A x64 `
-            -DCMAKE_BUILD_TYPE=Release
+            -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
+
 
       # --------------------------------------------------------
       # Build
@@ -79,15 +99,21 @@ jobs:
             --config Release `
             --parallel
 
+
       # --------------------------------------------------------
       # Prepare Windows distribution
       # --------------------------------------------------------
       - name: Deploy Qt libraries
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path dist | Out-Null
 
-          Write-Host "Deploying Qt..."
+          New-Item `
+            -ItemType Directory `
+            -Force `
+            -Path dist | Out-Null
+
+
+          Write-Host "Deploying Qt libraries..."
 
           windeployqt `
             --release `
@@ -95,11 +121,13 @@ jobs:
             --dir dist `
             "build/Release/spritesize.exe"
 
-          Write-Host "Copying executable..."
+
+          Write-Host "Copying application..."
 
           Copy-Item `
             "build/Release/spritesize.exe" `
             "dist/spritesize.exe"
+
 
           Write-Host "Searching for translation files..."
 
@@ -108,16 +136,24 @@ jobs:
             -Filter "*.qm" `
             -Recurse `
             -ErrorAction SilentlyContinue |
-            ForEach-Object {
-              Write-Host "Copying $($_.FullName)"
-              Copy-Item $_.FullName "dist/"
-            }
+          ForEach-Object {
 
-          Write-Host "Distribution contents:"
+            Write-Host "Copying:"
+            Write-Host $_.FullName
+
+            Copy-Item `
+              $_.FullName `
+              "dist/"
+          }
+
+
+          Write-Host ""
+          Write-Host "Windows distribution:"
           Get-ChildItem -Recurse dist
 
+
       # --------------------------------------------------------
-      # Upload artifact
+      # Upload Windows artifact
       # --------------------------------------------------------
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
@@ -133,34 +169,36 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
+
       # --------------------------------------------------------
       # Checkout
       # --------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
+
       # --------------------------------------------------------
-      # Disable Google Chrome apt repository
-      #
-      # Иногда runner содержит активный репозиторий Chrome,
-      # который ломает apt-get update через Hash Sum mismatch.
-      # Нам Chrome для сборки SpriteSize не нужен.
+      # Disable broken Google Chrome repository
       # --------------------------------------------------------
       - name: Disable Google Chrome apt repository
         shell: bash
         run: |
-          echo "Searching for Google Chrome repositories..."
+
+          echo "Searching for Google Chrome apt repositories..."
 
           sudo grep -RIl "dl.google.com/linux/chrome" \
             /etc/apt/sources.list \
             /etc/apt/sources.list.d \
-            2>/dev/null \
-            | while read -r file; do
+            2>/dev/null |
+          while read -r file; do
 
-              echo "Disabling repository: $file"
+            echo "Disabling:"
+            echo "$file"
 
-              sudo mv "$file" "$file.disabled"
-            done
+            sudo mv "$file" "$file.disabled"
+
+          done
+
 
           echo ""
           echo "Remaining Google repositories:"
@@ -170,31 +208,35 @@ jobs:
             /etc/apt/sources.list.d \
             2>/dev/null || true
 
+
       # --------------------------------------------------------
-      # Clean APT cache
+      # Clean apt
       # --------------------------------------------------------
       - name: Clean apt cache
         run: |
           sudo rm -rf /var/lib/apt/lists/*
           sudo apt-get clean
 
+
       # --------------------------------------------------------
-      # Update APT
+      # Update apt
       # --------------------------------------------------------
       - name: Update apt
         run: |
           sudo apt-get update
 
+
       # --------------------------------------------------------
-      # System dependencies
+      # Linux dependencies
       # --------------------------------------------------------
-      - name: Install Linux build dependencies
+      - name: Install Linux dependencies
         run: |
           sudo apt-get install -y \
             build-essential \
             libgl1-mesa-dev \
             libxkbcommon-dev \
             libxkbcommon-x11-dev
+
 
       # --------------------------------------------------------
       # Install Qt 6.11.2
@@ -206,27 +248,69 @@ jobs:
           host: linux
           target: desktop
 
-          # Базовый Qt + QML/Quick + Qt Linguist
           archives: "qtbase qtdeclarative qttools"
 
           cache: true
 
+
       # --------------------------------------------------------
-      # Show Qt information
+      # IMPORTANT:
+      # Qt 6.11.2 contains its own ICU libraries.
+      #
+      # Добавляем и Qt root, и Qt/lib в runtime search path.
       # --------------------------------------------------------
-      - name: Show Qt information
+      - name: Configure Qt runtime paths
         shell: bash
         run: |
-          echo "QT_ROOT_DIR = $QT_ROOT_DIR"
 
+          echo "QT_ROOT_DIR=$QT_ROOT_DIR"
+
+          echo "LD_LIBRARY_PATH before:"
+          echo "$LD_LIBRARY_PATH"
+
+          echo "LD_LIBRARY_PATH=$QT_ROOT_DIR:$QT_ROOT_DIR/lib:$LD_LIBRARY_PATH" \
+            >> "$GITHUB_ENV"
+
+          echo "PATH=$QT_ROOT_DIR/bin:$PATH" \
+            >> "$GITHUB_ENV"
+
+          echo ""
+          echo "Qt files:"
+
+          ls -la "$QT_ROOT_DIR" || true
+
+          echo ""
+          echo "ICU libraries:"
+
+          find "$QT_ROOT_DIR" \
+            -maxdepth 2 \
+            -type f \
+            -name "libicu*.so*" \
+            -print || true
+
+
+      # --------------------------------------------------------
+      # Check Qt
+      # --------------------------------------------------------
+      - name: Check Qt installation
+        shell: bash
+        run: |
+
+          echo "QT_ROOT_DIR=$QT_ROOT_DIR"
+
+          echo ""
+          echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+
+          echo ""
           echo "Qt version:"
+
           qmake --version
 
           echo ""
-          echo "Qt binaries:"
-          find "$QT_ROOT_DIR" -maxdepth 3 -type f \
-            \( -name "qmake" -o -name "qml" \) \
-            2>/dev/null || true
+          echo "CMake version:"
+
+          cmake --version
+
 
       # --------------------------------------------------------
       # Configure CMake
@@ -234,7 +318,9 @@ jobs:
       - name: Configure CMake
         run: |
           cmake -S . -B build \
-            -DCMAKE_BUILD_TYPE=Release
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR"
+
 
       # --------------------------------------------------------
       # Build
@@ -245,32 +331,43 @@ jobs:
             --config Release \
             --parallel
 
+
       # --------------------------------------------------------
       # Prepare Linux distribution
       # --------------------------------------------------------
       - name: Prepare Linux package
         shell: bash
         run: |
+
           mkdir -p dist
 
-          echo "Copying executable..."
 
-          cp build/spritesize dist/
+          echo "Copy executable..."
 
-          echo "Searching for translation files..."
+          cp build/spritesize \
+             dist/spritesize
+
+
+          echo ""
+          echo "Searching for QM files..."
 
           find build \
             -type f \
             -name "*.qm" \
             -exec cp {} dist/ \;
 
-          echo ""
-          echo "Distribution contents:"
 
-          find dist -maxdepth 2 -type f -print
+          echo ""
+          echo "Linux distribution:"
+
+          find dist \
+            -maxdepth 2 \
+            -type f \
+            -print
+
 
       # --------------------------------------------------------
-      # Upload artifact
+      # Upload Linux artifact
       # --------------------------------------------------------
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4

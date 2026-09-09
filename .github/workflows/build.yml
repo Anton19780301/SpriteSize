@@ -19,8 +19,6 @@ jobs:
     - name: Set up MSVC Developer Command Prompt
       uses: ilammy/msvc-dev-cmd@v1
 
-    # ЖЕЛЕЗОБЕТОННЫЙ ФИКС: Отключаем псевдонимы приложений Microsoft Store в реестре Windows.
-    # Это навсегда убирает ошибку "permission denied" для python.EXE на серверах GitHub!
     - name: Disable Windows Apps Python Alias
       run: |
         Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\App Paths\python.exe" -Name "(Default)" -ErrorAction SilentlyContinue
@@ -32,10 +30,12 @@ jobs:
     - name: Install Qt 6.5.3
       uses: jurplel/install-qt-action@v3
       with:
-        version: '6.5.3' # Стабильная, проверенная временем LTS версия
+        version: '6.5.3'
         host: 'windows'
         target: 'desktop'
-        arch: 'win64_msvc2022'
+        # ИСПРАВЛЕНО: Для Qt 6.5 в базах пакетов архитектура называется именно так.
+        # Компилятор MSVC 2022 на сервере проглотит её без проблем (у них обратная совместимость)
+        arch: 'win64_msvc2019_64' 
         modules: ''
 
     - name: Create build directory

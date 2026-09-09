@@ -27,15 +27,13 @@ jobs:
         $filteredPath = ($sysPath -split ';' | Where-Object { $_ -notlike "*WindowsApps*" }) -join ';'
         [Environment]::SetEnvironmentVariable("Path", $filteredPath, "Process")
 
-    - name: Install Qt 6.5.3
+    - name: Install Qt 6.8.0
       uses: jurplel/install-qt-action@v3
       with:
-        version: '6.5.3'
+        version: '6.8.0' # Исправленная LTS версия
         host: 'windows'
         target: 'desktop'
-        # ИСПРАВЛЕНО: Для Qt 6.5 в базах пакетов архитектура называется именно так.
-        # Компилятор MSVC 2022 на сервере проглотит её без проблем (у них обратная совместимость)
-        arch: 'win64_msvc2019_64' 
+        arch: 'win64_msvc2022' # Официальное имя архитектуры в ветке 6.8
         modules: ''
 
     - name: Create build directory

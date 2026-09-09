@@ -33,8 +33,8 @@ qt_add_executable(spritesize
 )
 
 set(TS_FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/i18n/spritesize_en.ts
-    ${CMAKE_CURRENT_SOURCE_DIR}/i18n/spritesize_ru.ts
+    "i18n/spritesize_en.ts"
+    "i18n/spritesize_ru.ts"
 )
 
 qt_add_translations(spritesize

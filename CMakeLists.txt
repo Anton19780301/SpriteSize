@@ -8,7 +8,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick LinguistTools)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick LinguistTools QuickControls2)
 
 add_executable(SpriteSize
     src/main.cpp
@@ -18,7 +18,6 @@ add_executable(SpriteSize
     src/translator.h
 )
 
-# --- БЛОК ПЕРЕВОДА ---
 set(TS_FILES i18n/spritesize_en.ts i18n/spritesize_ru.ts)
 qt_add_translations(SpriteSize TS_FILES ${TS_FILES} QM_FILES_OUTPUT_VARIABLE QM_FILES)
 if(QM_FILES)
@@ -34,13 +33,16 @@ qt_add_qml_module(SpriteSize
         qml/TabProcess.qml
         qml/TabSettings.qml
         qml/TabAbout.qml
+        QML_FILES qml/AssetList.qml
 )
+
 
 target_link_libraries(SpriteSize PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Qml
     Qt6::Quick
+    Qt6::QuickControls2
 )
 
 if(WIN32)

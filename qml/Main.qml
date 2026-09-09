@@ -43,4 +43,43 @@ ApplicationWindow {
             id: tabAbout
         }
     }
+
+    footer: ToolBar {
+        id: statusBar
+        height: 25
+
+        background: Rectangle {
+            color: "#F5F5F5" // Светло-серый аккуратный фон
+            border.color: "#E0E0E0"
+            border.width: 1
+        }
+
+        RowLayout {
+            anchors.fill: parent
+            anchors.leftMargin: 15
+            anchors.rightMargin: 15
+
+            // Текст статуса, связанный с C++
+            Label {
+                id: statusText
+                // Защита от null на этапе инициализации приложения
+                text: (typeof imageProcessor !== "undefined" && imageProcessor !== null)
+                      ? imageProcessor.statusMessage
+                      : qsTr("Инициализация...")
+                font.pointSize: 9
+                color: "#555555"
+                Layout.fillWidth: true
+                elide: Text.ElideRight
+            }
+
+            // Маленький индикатор, если идет процесс (опционально, для красоты)
+            BusyIndicator {
+                height: 16
+                width: 16
+                running: typeof imageProcessor !== "undefined" && imageProcessor !== null && imageProcessor.progress > 0 && imageProcessor.progress < 100
+                visible: running
+            }
+        }
+    }
 }
+

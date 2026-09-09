@@ -53,15 +53,18 @@ jobs:
     - name: Deploy Windows Binary (windeployqt)
       run: |
         cd build
-        windeployqt --qmldir ../qml Release/spritesize.exe
-        copy spritesize_en.qm Release\
-        copy spritesize_ru.qm Release\
+        # ИСПРАВЛЕНО: Так как qt_add_executable кладет spritesize.exe прямо в корень папки build,
+        # мы вызываем windeployqt для текущего каталога и копируем .qm файлы прямо сюда
+        windeployqt --qmldir ../qml spritesize.exe
+        copy spritesize_en.qm .\
+        copy spritesize_ru.qm .\
 
     - name: Upload Windows Artifact
       uses: actions/upload-artifact@v4
       with:
         name: SpriteSize-Windows
-        path: build/Release/
+        # ИСПРАВЛЕНО: Выгружаем содержимое папки build, где теперь лежит готовый упакованный релиз
+        path: build/
 
   # ================= СБОРКА ПОД LINUX =================
   build-linux:

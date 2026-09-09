@@ -27,6 +27,7 @@ public:
     Q_INVOKABLE void scanDirectory();
     Q_INVOKABLE void toggleAssetSelection(int index, bool selected);
     Q_INVOKABLE void startProcessing(int targetWidth, int targetHeight, bool useNearestNeighbor);
+    Q_INVOKABLE void setAllAssetsChecked(bool checked);
 
 signals:
     void inputPathChanged();

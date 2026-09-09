@@ -15,19 +15,16 @@ find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick LinguistTools QuickContr
 # Настройка стандартов путей ресурсов (убирает предупреждение QTP0001)
 qt_standard_project_setup()
 
-# ИСПРАВЛЕНО: Называем исполняемый файл spritesize (с маленькой буквы),
-# чтобы линкер Linux не конфликтовал с именем папки репозитория "SpriteSize"
 add_executable(spritesize
     src/main.cpp
     src/processor.cpp
     src/processor.h
     src/translator.cpp
     src/translator.h
+    resources.qrc
 )
 
-# --- БЛОК ПЕРЕВОДА (ИСПРАВЛЕНО ДЛЯ WINDOWS CI) ---
-# ИСПРАВЛЕНО: Убрали абсолютные пути CMAKE_CURRENT_SOURCE_DIR.
-# Относительные пути страхуют парсер метатипов Qt от падения на Windows-серверах
+
 set(TS_FILES
     "i18n/spritesize_en.ts"
     "i18n/spritesize_ru.ts"
@@ -41,9 +38,7 @@ qt_add_translations(spritesize
 if(QM_FILES)
     target_sources(spritesize PRIVATE ${QM_FILES})
 endif()
-# ------------------------------------------------
 
-# Передаем наш QML модуль исполняемому файлу spritesize
 qt_add_qml_module(spritesize
     URI SpriteSize
     VERSION 1.0

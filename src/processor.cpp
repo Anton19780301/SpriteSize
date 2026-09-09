@@ -129,3 +129,16 @@ void ImageProcessor::processTask(int targetWidth, int targetHeight, bool useNear
     emit processingFinished(processedCount, tr("Обработка успешно завершена!"));
     scanDirectory();
 }
+
+
+void ImageProcessor::setAllAssetsChecked(bool checked) {
+    if (m_assetModel.isEmpty()) return;
+
+    for (int i = 0; i < m_assetModel.size(); ++i) {
+        QVariantMap asset = m_assetModel[i].toMap();
+        asset["checked"] = checked;
+        m_assetModel[i] = asset;
+    }
+
+    emit assetModelChanged();
+}

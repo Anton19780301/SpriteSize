@@ -54,6 +54,14 @@
         <source>Рабочая папка не выбрана</source>
         <translation>Working folder is not selected</translation>
     </message>
+    <message>
+        <source>☑ Выбрать все</source>
+        <translation>☑ Select All</translation>
+    </message>
+    <message>
+        <source>☐ Снять все</source>
+        <translation>☐ Deselect All</translation>
+    </message>
 </context>
 <context>
     <name>AssetList</name>

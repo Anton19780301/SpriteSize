@@ -77,6 +77,18 @@
         <translation>Batch Resize Settings</translation>
     </message>
     <message>
+        <source>Маска имени (опционально):</source>
+        <translation>Filename mask (optional):</translation>
+    </message>
+    <message>
+        <source>Например: TX_Building_## (станет TX_Building_01)</source>
+        <translation>E.g., TX_Building_## (becomes TX_Building_01)</translation>
+    </message>
+    <message>
+        <source>Сжатие и конвертация завершены! Обработано: %1</source>
+        <translation>Compression and conversion finished! Processed: %1</translation>
+    </message>
+    <message>
         <source>Целевой размер спрайта:</source>
         <translation>Target sprite size:</translation>
     </message>
@@ -124,8 +136,20 @@
         <translation>Interface Language:</translation>
     </message>
     <message>
-        <source>Смена языка происходит мгновенно для всех элементов интерфейса. Перевод подхватывается из бинарных файлов локализации Qt Linguist (.qm).</source>
-        <translation>Language change occurs instantly for all interface elements. The translation is loaded from Qt Linguist binary localization files (.qm).</translation>
+        <source>Тема оформления:</source>
+        <translation>UI Theme:</translation>
+    </message>
+    <message>
+        <source>Тёмная</source>
+        <translation>Dark</translation>
+    </message>
+    <message>
+        <source>Светлая</source>
+        <translation>Light</translation>
+    </message>
+    <message>
+        <source>Настройки темы и языка применяются мгновенно ко всем вкладкам приложения.</source>
+        <translation>Theme and language settings are applied instantly to all application tabs.</translation>
     </message>
 </context>
 <context>

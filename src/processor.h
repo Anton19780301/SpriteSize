@@ -12,6 +12,8 @@ class ImageProcessor : public QObject
     Q_PROPERTY(int progress READ progress NOTIFY progressChanged)
     Q_PROPERTY(QVariantList assetModel READ assetModel NOTIFY assetModelChanged)
     Q_PROPERTY(QString statusMessage READ statusMessage NOTIFY statusMessageChanged)
+    Q_PROPERTY(QString renameMask READ renameMask WRITE setRenameMask NOTIFY renameMaskChanged)
+
 
 public:
     explicit ImageProcessor(QObject *parent = nullptr);
@@ -30,12 +32,21 @@ public:
     Q_INVOKABLE void startProcessing(int targetWidth, int targetHeight, bool useNearestNeighbor, const QString &targetFormat);
 
 
+    QString renameMask() const { return m_renameMask; }
+    void setRenameMask(const QString &mask) {
+        if (m_renameMask != mask) {
+            m_renameMask = mask;
+            emit renameMaskChanged();
+        }
+    }
+
 signals:
     void inputPathChanged();
     void progressChanged();
     void assetModelChanged();
     void statusMessageChanged();
     void processingFinished(int totalProcessed, const QString &message);
+    void renameMaskChanged();
 
 private:
     //QString m_m_inputPath;
@@ -43,8 +54,8 @@ private:
     int m_progress = 0;
     QVariantList m_assetModel;
     QString m_statusMessage = "Программа готова к работе";
-
-    void processTask(int targetWidth, int targetHeight, bool useNearestNeighbor, const QString &targetFormat);
+    QString m_renameMask = "";
+    void processTask(int targetWidth, int targetHeight, bool useNearestNeighbor, const QString &targetFormat, const QString &renameMask);
 
 };
 

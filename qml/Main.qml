@@ -4,7 +4,7 @@ import QtQuick.Layouts
 
 ApplicationWindow {
     id: window
-    width: 650
+    width: 1024
     height: 450
     minimumWidth: 500
     minimumHeight: 400

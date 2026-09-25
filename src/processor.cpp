@@ -92,13 +92,30 @@ void ImageProcessor::processTask(int targetWidth, int targetHeight, bool useNear
 
         QImage img;
         if (img.load(backupFilePath)) {
-            QImage scaledImg = img.scaled(targetWidth, targetHeight, Qt::IgnoreAspectRatio, mode);
+            // --- РАСШИРЕНИЕ: ВЫЧИСЛЕНИЕ РАЗМЕРОВ (БЕЗ СЛОМА СТАРЫХ СПОСОБОВ) ---
+            int finalWidth = targetWidth;
+            int finalHeight = targetHeight;
+
+            // Если пришло отрицательное число — значит включен процентный режим
+            if (targetWidth < 0) {
+                int percent = qAbs(targetWidth); // Получаем чистый процент (например, 50 из -50)
+                finalWidth = (img.width() * percent) / 100;
+                finalHeight = (img.height() * percent) / 100;
+
+                // Защита, чтобы картинка не сжалась в 0 пикселей
+                if (finalWidth < 1) finalWidth = 1;
+                if (finalHeight < 1) finalHeight = 1;
+            }
+
+            // Теперь scaled использует finalWidth и finalHeight, сохраняя логику для обоих режимов
+            QImage scaledImg = img.scaled(finalWidth, finalHeight, Qt::IgnoreAspectRatio, mode);
+            // ------------------------------------------------------------------
 
             // 1. Вычисляем целевое расширение
             QString targetExt = (targetFormat != "ORIGINAL") ? targetFormat.toLower() : QFileInfo(fileName).suffix().toLower();
             QString saveFormat = (targetFormat != "ORIGINAL") ? targetFormat : QFileInfo(fileName).suffix().toUpper();
 
-            // 2. РЕАЛИЗАЦИЯ МАССОВОГО ПЕРЕИМЕНОВАНИЯ
+            // 2. РЕАЛИЗАЦИЯ МАССОВОГО ПЕРЕИМЕНОВАНИЯ (Код остался нетронутым)
             QString newFileName = fileName;
 
             if (!renameMask.isEmpty()) {
@@ -146,6 +163,7 @@ void ImageProcessor::processTask(int targetWidth, int targetHeight, bool useNear
     emit processingFinished(processedCount, tr("Обработка успешно завершена!"));
     scanDirectory();
 }
+
 
 void ImageProcessor::setStatusMessage(const QString &message) {
     if (m_statusMessage != message) {

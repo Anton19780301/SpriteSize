@@ -123,6 +123,14 @@
     <message>
         <source>ОБРАБОТКА...</source>
         <translation>PROCESSING...</translation>
+    </message>   
+    <message>
+        <source>Опционально: walk_## (где # станет 00, 01...)</source>
+        <translation>Optional: walk_## (# becomes 00, 01...)</translation>
+    </message>
+    <message>
+        <source>Старт:</source>
+        <translation>Start:</translation>
     </message>
 </context>
 <context>

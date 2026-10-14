@@ -13,6 +13,7 @@ class ImageProcessor : public QObject
     Q_PROPERTY(QVariantList assetModel READ assetModel NOTIFY assetModelChanged)
     Q_PROPERTY(QString statusMessage READ statusMessage NOTIFY statusMessageChanged)
     Q_PROPERTY(QString renameMask READ renameMask WRITE setRenameMask NOTIFY renameMaskChanged)
+    Q_PROPERTY(int startIndex READ startIndex WRITE setStartIndex NOTIFY startIndexChanged)
 
 
 public:
@@ -40,6 +41,14 @@ public:
         }
     }
 
+    int startIndex() const { return m_startIndex; }
+    void setStartIndex(int index) {
+        if (m_startIndex != index) {
+            m_startIndex = index;
+            emit startIndexChanged();
+        }
+    }
+
 signals:
     void inputPathChanged();
     void progressChanged();
@@ -47,6 +56,7 @@ signals:
     void statusMessageChanged();
     void processingFinished(int totalProcessed, const QString &message);
     void renameMaskChanged();
+    void startIndexChanged();
 
 private:
     //QString m_m_inputPath;
@@ -55,7 +65,8 @@ private:
     QVariantList m_assetModel;
     QString m_statusMessage = "Программа готова к работе";
     QString m_renameMask = "";
-    void processTask(int targetWidth, int targetHeight, bool useNearestNeighbor, const QString &targetFormat, const QString &renameMask);
+    void processTask(int targetWidth, int targetHeight, bool useNearestNeighbor, const QString &targetFormat, const QString &renameMask, int startIndex);
+    int m_startIndex = 0;
 
 };
 

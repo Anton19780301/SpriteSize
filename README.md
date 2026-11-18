@@ -40,7 +40,7 @@
 
 1. Клонируем репозиторий:
    ```bash
-   git clone https://github.com
+   git clone git@github.com:Anton19780301/SpriteSize.git
    cd SpriteSize
    ```
 
